@@ -43,5 +43,5 @@ if __name__ == "__main__":
 	# filename = '/home/cai/Dropbox/Box_Research/Github/CETSP/python/toy/toy1.cetsp'
 	# write_instance(filename)
 
-	filename = '/home/cai/Dropbox/Box_Research/Github/CETSP/python/toy/toy1rdm.cetsp'
+	filename = '/home/latte/Dropbox/Box_Research/Github/CETSP/python/toy/toy1rdm.cetsp'
 	write_rdminstance(filename)
