@@ -12,6 +12,8 @@ import networkx as nx
 import GBCuts
 import CircularNeighborhoods as CNgb
 import ConvexPolygonNeighborhoods as CvxPolyNgb
+import VisibilityMatrix
+
 def read_instance_Behdani(instancefile):
 	file_ = open(instancefile, 'r')
 	X = []
@@ -30,13 +32,12 @@ def read_instance_Behdani(instancefile):
 			# print(list_)
 			X.append(float(list_[0]))
 			Y.append(float(list_[1]))
-			R.append(1.5)
+			R.append(0.5)
 
 	file_.close()
 	return depot, X, Y, R
 
-	
-def plot_Behdani_instance(depot, X, Y, R):
+def plot_instance(depot, X, Y, R):
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 	# plt.axis('off')
@@ -47,25 +48,52 @@ def plot_Behdani_instance(depot, X, Y, R):
 	ax.set_xlim([min(XX)-max(R), max(XX)+max(R)])
 	ax.set_ylim([min(YY)-max(R), max(YY)+max(R)])
 	ax.set_aspect('equal', adjustable='box')
-	rect = pch.Rectangle((depot[0], depot[1]), 0.2, 0.2, edgecolor='k',fill=True) 
+	rect = pch.Rectangle((depot[0], depot[1]), 0.2, 0.2, edgecolor='black',fill=False) 
 	ax.add_patch(rect) 
 	for i in range(len(X)):
-		circle = plt.Circle((X[i], Y[i]), radius=R[i], edgecolor='r',fill=False, alpha = 0.5)
+		circle = plt.Circle((X[i], Y[i]), radius=R[i], edgecolor='r',fill=False, alpha = 0.4)
 		ax.add_artist(circle)
 		ax.annotate(str(i+1), xy=(X[i], Y[i]), xytext=(X[i], Y[i]),size=11)
-	plt.xticks(np.arange(min(XX)-max(R),max(XX)+max(R),0.5))
-	plt.yticks(np.arange(min(YY)-max(R),max(YY)+max(R),0.5))
+	# plt.xticks(np.arange(min(XX)-max(R),max(XX)+max(R),0.5))
+	# plt.yticks(np.arange(min(YY)-max(R),max(YY)+max(R),0.5))
 	# plt.grid(alpha=.5)
 	plt.show()
 
 
-def  solve_MasterProb(depot, Ox, Oy, Or, separators):
+
+def read_Mennell_instance(instancefile):
+	file_ = open(instancefile, 'r')
+	X = []
+	Y = []
+	R = []
+	line_ = file_.readline()
+	list_ = re.split(" |\t|\n", line_)
+	depot = [float(list_[0]), float(list_[1])]
+	while True:
+		line_ = file_.readline()
+		list_ = re.split(" |\t|\n", line_)
+		if list_[0] == '':
+			break
+		else:
+			list_ = list(filter(None, list_))
+			# print(list_)
+			X.append(float(list_[0]))
+			Y.append(float(list_[1]))
+			R.append(float(list_[3])*0.1)
+			# R.append(11.697)
+
+
+
+	file_.close()
+	return depot, X, Y, R
+
+def  solve_MasterProb(depot, Ox, Oy, Or, SD, separators):
 	nb_tars = len(Ox)
 	try:
 		# Create a new model
 		model = gp.Model("GBD_CETSP")
-		model.setParam(GRB.Param.OutputFlag, 0)
-		model.setParam(GRB.Param.TimeLimit, 1500.0)
+		model.setParam(GRB.Param.OutputFlag, 1)
+		# model.setParam(GRB.Param.TimeLimit, 15000.0)
 
 		model._depot1 = depot
 		model._depot2 = depot  
@@ -73,11 +101,14 @@ def  solve_MasterProb(depot, Ox, Oy, Or, separators):
 		model._Ox = Ox
 		model._Oy = Oy
 		model._Or = Or
+		model._SD = SD
 		model._separators = separators
 		# zbar = np.full((nb_tars+1, nb_tars+1), np.inf)
 		zbar = np.zeros((nb_tars+2, nb_tars+2))
 		for i in range(nb_tars):
 			dist = max([math.sqrt((Ox[i]-depot[0])**2 + (Oy[i]-depot[1])**2) -Or[i],0])
+			# dist = math.sqrt((Ox[i]-depot[0])**2 + (Oy[i]-depot[1])**2) 
+
 			zbar[0,i+1] = dist
 			zbar[i+1,0] = zbar[0,i+1]
 			zbar[i+1,nb_tars+1] = zbar[0,i+1]
@@ -87,6 +118,8 @@ def  solve_MasterProb(depot, Ox, Oy, Or, separators):
 			for j in range(nb_tars):
 				if i != j:
 					dist = max([math.sqrt((Ox[i]-Ox[j])**2 + (Oy[i]-Oy[j])**2) - Or[i] - Or[j],0])
+					# dist = math.sqrt((Ox[i]-Ox[j])**2 + (Oy[i]-Oy[j])**2)
+
 					zbar[i+1,j+1] = dist
 					zbar[j+1,i+1] = zbar[i+1,j+1]
 
@@ -95,7 +128,7 @@ def  solve_MasterProb(depot, Ox, Oy, Or, separators):
 		# binary variables
 		M = 1000.0
 		varE = model.addVars(nb_tars+2, nb_tars+2, vtype=GRB.BINARY,name="E")
-		theta = model.addVar(lb=0.0,vtype=GRB.CONTINUOUS,name="theta")
+		theta = model.addVar(lb=0,vtype=GRB.CONTINUOUS,name="theta")
 		obj = 0
 		for i in range(nb_tars+2):
 			for j in range(nb_tars+2):
@@ -104,6 +137,7 @@ def  solve_MasterProb(depot, Ox, Oy, Or, separators):
 		model.setObjective(obj, GRB.MINIMIZE)
 		# model.modelSense = GRB.MINIMIZE
 		
+
 		# constraints
 		for i in range(0, nb_tars+2):
 			constr1 = 0
@@ -115,12 +149,12 @@ def  solve_MasterProb(depot, Ox, Oy, Or, separators):
 			model.addConstr(constr2 == 1, 'c_'+str(i)) 
 			model.update()
 		# remove TSP sequence of inverse order
-		exprA = 0
-		exprB = 0
-		for i in range(1,nb_tars+1):
-			exprA += i * varE[0,i]
-			exprB += i * varE[i,nb_tars+1]
-		model.addConstr(exprA <= exprB, 'inv') 
+		# exprA = 0
+		# exprB = 0
+		# for i in range(1,nb_tars+1):
+		# 	exprA += i * varE[0,i]
+		# 	exprB += i * varE[i,nb_tars+1]
+		# model.addConstr(exprA <= exprB, 'inv') 
 
 		varE[nb_tars+1,0].lb = 1.0
 		varE[0,nb_tars+1].ub = 0.0
@@ -149,9 +183,10 @@ def  solve_MasterProb(depot, Ox, Oy, Or, separators):
 				# print('\n',end='')
 
 			cirset, curBestSeq =  find_all_subtours(curObj, model._size)
-			# print(curBestSeq)
+			print(curBestSeq)
 			optTour, objLen = GBCuts.solve_SOCP_Disc(depot, Ox, Oy, Or, curBestSeq)
-			CNgb.plot_Behdani_instance(depot, Ox, Oy, Or, optTour)
+			CNgb.plot_instance(depot, Ox, Oy, Or, optTour)
+
 			# print('Theta: %g' % theta.x)
 			# print('Gurobi Time: %g' % model.Runtime)
 			# print('OBJ: %g' % model.objVal)
@@ -161,8 +196,6 @@ def  solve_MasterProb(depot, Ox, Oy, Or, separators):
 		print('Error code ' + str(e.errno) + ': ' + str(e))
 	except AttributeError:
 		print('Encountered an attribute error')
-
-
 
 def  solve_MasterProb_CvxPolyNgbs(depot, LPC, HULLs):
 	nb_tars = len(LPC)
@@ -234,7 +267,7 @@ def  solve_MasterProb_CvxPolyNgbs(depot, LPC, HULLs):
 			cirset, curBestSeq =  find_all_subtours(curObj, model._size)
 			# print(curBestSeq)
 			optTour, objLen = GBCuts.solve_SOCP_CvxPolyNgbs(model, curBestSeq)
-			# CvxPolyNgb.plot_CvxPoly_Instance_wOptTour(model._depot1, HULLs, optTour)
+			CvxPolyNgb.plot_CvxPoly_Instance_wOptTour(model._depot1, HULLs, optTour)
 			# print('Theta: %g' % theta.x)
 			# print('Gurobi Time: %g' % model.Runtime)
 			# print('OBJ: %g' % model.objVal)
@@ -258,27 +291,56 @@ def callback_GBD(model, where):
 		Cirset,fseq = find_all_subtours(vals, model._size)
 		# print(Cirset,fseq)
 		if (len(Cirset) != 0):
-			for circle in Cirset:
-				constr = 0
-				for i in range(0,len(circle)-1):
-					constr += model._varE[circle[i],circle[i+1]]
-				constr += model._varE[circle[-1],circle[0]]
-
-				model.cbLazy(constr <= len(circle)-1)
-				model._nb_SECs  += 1
-		else:
-			# mu0, mu1, obj = GBCuts.generate_GenOptimalityCut(model, fseq)
-			mu0, mu1, obj = GBCuts.generate_GBC_CvxPolyNgbs(model, fseq)
-
-			# print(objbar,obj, objbar + obj)
-
+			# for circle in Cirset:
+			smalllens = float('inf')
+			smallindex = -1
+			for i in range(len(Cirset)):
+				if len(Cirset[i]) < smalllens:
+					smalllens = len(Cirset[i])
+					smallindex = i
+			circle = Cirset[smallindex]	
 			constr = 0
-			for el in mu1:
-				constr += el[2] * (model._varE[el[0],el[1]] - 1.0)
-			# for el in mu0:
-			# 	constr += el[2] * (model._varE[el[0],el[1]] - 0.0)
-			model.cbLazy(obj + constr <= model._theta)
-			model._nb_GBCs += 1
+			for i in range(0,len(circle)-1):
+				constr += model._varE[circle[i],circle[i+1]]
+			constr += model._varE[circle[-1],circle[0]]
+			model.cbLazy(constr <= len(circle)-1)
+			model._nb_SECs  += 1
+		else:
+			'''supply_demand balance check '''
+			SD_balanced = True
+			for i in range(1, model._size):
+				sum_sd = 0
+				for j in range(0, i):
+					sum_sd += model._SD[fseq[j]]
+				if sum_sd < 0:
+					# print(sum_sd)
+					SD_balanced = False
+					break
+			if not SD_balanced:
+			# if False:
+				constr = 0
+				# print(fseq)
+				for i in range(0, model._size-1):
+					constr += model._varE[fseq[i],fseq[i+1]]
+					# print(fseq[i],fseq[i+1], end=', ')
+				# print('')
+				model.cbLazy(constr <= model._size-2)
+			
+
+				# print('....addded ')
+			else:
+				optTour, objLen = GBCuts.solve_SOCP_Disc(depot, Ox, Oy, Or, fseq)
+				# print(fseq, objLen)
+				mu0, mu1, obj = GBCuts.generate_GenOptimalityCut(model, fseq)
+				# print(mu0,mu1)
+				# mu0, mu1, obj = GBCuts.generate_GBC_CvxPolyNgbs(model, fseq)
+				constr = 0
+				for el in mu1:
+					constr += el[2] * (model._varE[el[0],el[1]] - 1.0)
+				# for el in mu0:
+				# 	constr += el[2] * (model._varE[el[0],el[1]] - 0.0)
+				model.cbLazy(obj + constr <= model._theta)
+				model._nb_GBCs += 1
 
 def find_all_subtours(curSol, matsize):
 	visited = [False]*matsize
@@ -317,7 +379,7 @@ def find_all_subtours(curSol, matsize):
 				break
 	
 	return Cirset,fseq
- 		
+		
 def find_all_subcomponents(curSol, matsize):
 	# visited = [False]*matsize
 	# cur_node = 0
@@ -342,15 +404,20 @@ def find_all_subcomponents(curSol, matsize):
 if __name__ == "__main__":
 	instance = argv[1]
 	''' discs '''
-	# depot, Ox, Oy, Or = read_instance_Behdani(instance)
-	# # plot_Behdani_instance(depot, Ox, Oy, Or)
-	# separators = CNgb.find_separators(depot, Ox, Oy, Or)
-	# solve_MasterProb(depot, Ox, Oy, Or, separators)
+	depot, Ox, Oy, Or = read_instance_Behdani(instance)
+	SD = [0, -2, -2, -3, -4, -4, -3, -3, -5, -5, -2.5, -2.5, -2.5, -2.5, +3, 15, 3, 10, 10] 
+	# SD = [0,  -5, -3,  -3, +3, +4,  +4] 
+
+	# depot, Ox, Oy, Or = read_Mennell_instance(instance)
+	# plot_instance(depot, Ox, Oy, Or)
+	separators = CNgb.find_separators(depot, Ox, Oy, Or)
+	# blkmat, depot, new_Ox, new_Oy, new_Or = VisibilityMatrix.main_blkmat(instance)
+	solve_MasterProb(depot, Ox, Oy, Or, SD, separators)
 
 	''' Convex polygon Neighborhoods '''
-	depot, HULLs = CvxPolyNgb.read_cvxp_instance(instance)
-	LPC = CvxPolyNgb.convert_HULL_LPConsts(HULLs)
-	solve_MasterProb_CvxPolyNgbs(depot, LPC, HULLs)
+	# depot, HULLs = CvxPolyNgb.read_cvxp_instance(instance)
+	# LPC = CvxPolyNgb.convert_HULL_LPConsts(HULLs)
+	# solve_MasterProb_CvxPolyNgbs(depot, LPC, HULLs)
 
 	# for i in range(15,21):
 	# 	instance = '/home/latte/Dropbox/Box_Research/Github/CETSP/dat/Cai/cvxp_18_' + str(i)

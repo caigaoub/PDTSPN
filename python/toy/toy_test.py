@@ -169,7 +169,7 @@ def solve_model2(depot, oX, oY, oR):
 		model = gp.Model("SOCP")
 		model.setParam(GRB.Param.OutputFlag, 1)
 		model.setParam(GRB.Param.TimeLimit, 1000.0)
-
+		model.params.NonConvex = 2
 		# distance between two turning points
 		z0 = model.addVar(lb=0.0, vtype=GRB.CONTINUOUS,name="z0")
 		z1 = model.addVar(lb=0.0, vtype=GRB.CONTINUOUS,name="z1")
@@ -240,8 +240,86 @@ def solve_model2(depot, oX, oY, oR):
 		print('Encountered an attribute error')
 
 
+''' ----------------------------------------- '''
+''' solve SOCP model '''
+''' ----------------------------------------- '''
+def solve_model_cetsp():
+	# nb_tars = len(oX)
+	# depot = [0, 0]
+	T1 = [0, 0]
+	T2 = [4, 0]
+	R1 = 1
+	R2 = 1
+	try:
+		# Create a new model
+		model = gp.Model("model_tp")
+		model.setParam(GRB.Param.OutputFlag, 1)
+		model.setParam(GRB.Param.TimeLimit, 1000.0)
+		model.setParam(GRB.Param.NonConvex, 2)
+		
+		# distance between two turning points
+		z = model.addVar(lb=0.0, vtype=GRB.CONTINUOUS,name="z")
+		I1 = model.addVar(vtype=GRB.BINARY,name="I1")
+		I2 = model.addVar(vtype=GRB.BINARY,name="I2")
+
+
+		x1 = model.addVar(lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="x1")
+		y1 = model.addVar(lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="y1")
+		x2 = model.addVar(lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="x2")
+		y2 = model.addVar(lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="y2")
+		
+		alpha1 = model.addVar(lb=0, ub=1.0, vtype=GRB.CONTINUOUS,name="a1")
+		alpha2 = model.addVar(lb=0, ub=1.0, vtype=GRB.CONTINUOUS,name="a2")
+
+		u1 = model.addVar(lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="u1")
+		v1 = model.addVar(lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="v1")
+		u2 = model.addVar(lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="u2")
+		v2 = model.addVar(lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="v2")
+
+		m = model.addVar(lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="m")
+		n = model.addVar(lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="n")
+		obj = z
+		model.setObjective(obj, GRB.MINIMIZE)
+	
+
+		model.addConstr( T1[0] -  (alpha1 * x1 + (1 - alpha1) * x2) == u1, 'cst_u1') 
+		model.addConstr(T1[1] -  (alpha1 * y1 + (1 - alpha1) * y2)  == v1, 'cst_v1') 
+		model.addConstr(T2[0] -  (alpha2 * x1 + (1 - alpha2) * x2) == u2, 'cst_u2') 
+		model.addConstr(T2[1] -  (alpha2 * y1 + (1 - alpha2) * y2) == v2, 'cst_v2') 
+		model.addConstr(u1 * u1+ v1 * v1 <= 1  , 'cst_I1') 
+		model.addConstr(u2 * u2 + v2 * v2  <= 1 , 'cst_I2') 
+
+		# model.addConstr(I1 >= 1) 
+		# model.addConstr(I2 >= 1) 
+		model.addConstr(m ==  x1 - x2)
+		model.addConstr(n ==  y1 - y2) 
+		model.addConstr(m * m + n * n <= z*z) 
+
+
+
+		model.write('socp.lp')
+		model.optimize()
+
+		''' ------------- model output  ----------------------'''
+		if model.status == GRB.OPTIMAL or model.status == GRB.TIME_LIMIT:
+			print('Gurobi Time: %g' % model.Runtime)
+			print('point 1', x1.x, y1.x)
+			print('point 2', x2.x, y2.x)
+			print('alpha ', alpha1.x, alpha2.x)
+
+
+			# print('OBJ: %g' % obj.getValue())
+
+
+	except gp.GurobiError as e:
+		print('Error code ' + str(e.errno) + ': ' + str(e))
+
+	except AttributeError:
+		print('Encountered an attribute error')
+
 if __name__ == "__main__":
-	instance = argv[1]
-	depot, oX, oY, oR = read_toy(instance)
-	path = solve_model(depot, oX, oY, oR)
-	plot_toy(oX, oY, oR, path)
+	# instance = argv[1]
+	# depot, oX, oY, oR = read_toy(instance)
+	# path = solve_model(depot, oX, oY, oR)
+	# plot_toy(oX, oY, oR, path)
+ 	solve_model_cetsp()

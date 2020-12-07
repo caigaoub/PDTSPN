@@ -30,7 +30,7 @@ def read_instance_Mennell(instancefile):
 			# print(list_)
 			X.append(float(list_[0]))
 			Y.append(float(list_[1]))
-			R.append(float(list_[3]))
+			R.append(float(list_[3]) * 0.5)
 
 	file_.close()
 	return X, Y, R
@@ -50,7 +50,7 @@ def read_instance_Behdani(instancefile):
 			# print(list_)
 			X.append(float(list_[0]))
 			Y.append(float(list_[1]))
-			R.append(1)
+			R.append(0.5)
 
 	file_.close()
 	return X, Y, R
@@ -68,7 +68,22 @@ def plot_instance(X, Y, R, is_del):
 		for i in range(len(X)):
 			if not is_del[i]:
 				circle = plt.Circle((X[i], Y[i]), radius=R[i], edgecolor='r',fill=False, alpha = 0.5)
+				# circle = plt.Circle((X[i], Y[i]), radius=R[i], edgecolor='k',facecolor='grey', alpha = 0.5)
 				ax.add_artist(circle)
+	plt.show()
+
+def plot_instance_old(X, Y, R):
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+	# plt.axis('off')
+	ax.set_xlim([min(X)-max(R), max(X)+max(R)])
+	ax.set_ylim([min(Y)-max(R), max(Y)+max(R)])
+	ax.set_aspect('equal', adjustable='box')
+	
+	for i in range(len(X)):
+		circle = plt.Circle((X[i], Y[i]), radius=R[i], edgecolor='r',fill=False, alpha = 0.5)
+		# circle = plt.Circle((X[i], Y[i]), radius=R[i], edgecolor='k',facecolor='grey', alpha = 0.5)
+		ax.add_artist(circle)
 	plt.show()
 
 def remove_redundance(X, Y, R):
@@ -95,7 +110,12 @@ def remove_redundance(X, Y, R):
 
 if __name__ == "__main__":
 	instance = argv[1]
-	X, Y, R = read_instance_Behdani(instance)
+	# X, Y, R = read_instance_Behdani(instance)
+	# is_del = remove_redundance(X, Y, R)
+	# # print(is_del)
+	# plot_instance(X, Y, R, is_del)
+	X, Y, R = read_instance_Mennell(instance)
 	is_del = remove_redundance(X, Y, R)
-	# print(is_del)
 	plot_instance(X, Y, R, is_del)
+	# plot_instance_old(X, Y, R)
+

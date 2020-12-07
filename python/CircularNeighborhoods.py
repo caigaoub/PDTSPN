@@ -35,7 +35,7 @@ def read_instance_Behdani(instancefile):
 	file_.close()
 	return depot, X, Y, R
 
-def plot_Behdani_instance(depot, X, Y, R, optTour):
+def plot_instance(depot, X, Y, R, optTour):
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 	# plt.axis('off')
@@ -80,7 +80,7 @@ def plot_Behdani_instance(depot, X, Y, R, optTour):
 	# plt.yticks(np.arange(min(YY)-max(R),max(YY)+max(R),0.5))
 	plt.grid(alpha=.1)
 	# plt.axis('square')
-	plt.savefig('/home/latte/Dropbox/Box_Research/Github/CETSP/python/cetsp_Binst_8_10.pdf',dpi=300)
+	# plt.savefig('/home/latte/Dropbox/Box_Research/Github/CETSP/python/cetsp_Binst_8_10.pdf',dpi=300)
 	plt.show()
 
 def find_separators(depot, X, Y, R):

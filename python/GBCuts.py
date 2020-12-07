@@ -135,6 +135,8 @@ def generate_fractionalSolCut(model, curSol):
 
 
 def generate_GenOptimalityCut(model, fseq):
+	# print(fseq)
+
 	nb_tars = model._size - 2
 	vismat = np.zeros((model._size,model._size))
 	for i in range(len(fseq)-1):
@@ -145,7 +147,7 @@ def generate_GenOptimalityCut(model, fseq):
 		SP_m.setParam(GRB.Param.OutputFlag, 0)
 		SP_m.setParam(GRB.Param.TimeLimit, 1000.0)
 
-		varZ = SP_m.addVars(model._size, model._size, lb=0.00001,ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="Z")
+		varZ = SP_m.addVars(model._size, model._size, lb=0.000000,ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="Z")
 
 		varX = SP_m.addVars(model._size-2, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="X")
 		varY = SP_m.addVars(model._size-2, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="Y")
@@ -209,22 +211,23 @@ def generate_GenOptimalityCut(model, fseq):
 		SP_m.update()
 
 		# separator 
-		itr = 1
-		for sep in model._separators:
-			for i in range(0, nb_tars):
-				SP_m.addConstr( sep[0] * varX[i] + sep[1] * varY[i] + sep[2] <= 0, 'sep_'+str(itr)+str(i)) 
-			itr += 1
-		SP_m.update()
-		# SP_m.write('socp.lp')
+		# itr = 1
+		# for sep in model._separators:
+		# 	for i in range(0, nb_tars):
+		# 		SP_m.addConstr( sep[0] * varX[i] + sep[1] * varY[i] + sep[2] <= 0, 'sep_'+str(itr)+str(i)) 
+		# 	itr += 1
+		# SP_m.update()
+		# SP_m.write('socp2.lp')
 		SP_m.optimize()
+		# print('here1')
 
 		''' ------------- model output  ----------------------'''
 		if SP_m.status == GRB.OPTIMAL or SP_m.status == GRB.TIME_LIMIT:
-		
+			# print('here2')
 			mu1 = []
 			for i in range(model._size):
 				for j in range(model._size):
-					if i!=j and vismat[i,j] > 0:
+					if i != j and vismat[i,j] > 0:
 						# mu1.append([i,j,varZ[i,j].x])
 						mu1.append([i,j,varZ[i,j].x - model._zbar[i,j]])
 						# mu1.append([j,i,varZ[i,j].x - model._zbar[i,j]])					
@@ -423,7 +426,7 @@ def solve_SOCP_Disc(_depot, _Ox, _Oy, _Or, fseq):
 		SP_m.setParam(GRB.Param.TimeLimit, 1000.0)
 		
 		# distance between two turning points
-		Z = SP_m.addVars(nb_tars+1, lb=0.00, vtype=GRB.CONTINUOUS,name="spZ")
+		Z = SP_m.addVars(nb_tars+1, lb=0, vtype=GRB.CONTINUOUS,name="spZ")
 
 		X = SP_m.addVars(nb_tars+2,lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="spX")
 		Y = SP_m.addVars(nb_tars+2,lb=-gp.GRB.INFINITY,vtype=GRB.CONTINUOUS,name="spY")
