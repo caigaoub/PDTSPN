@@ -114,7 +114,7 @@ def plot_hull(depot, Hulls, seps_plot):
 	# ax.set_xlim([0, 4])
 	# ax.set_ylim([0, 4])
 	for sep in seps_plot:
-		plt.plot(sep[0], sep[1])
+		plt.plot(sep[0], sep[1],'r', alpha=0.5)
 
 
 	# for simplex in big_hull.simplices:
@@ -325,7 +325,7 @@ def generate_separators(HULL, depot):
 
 	# c_range = math.sqrt((maxx-minx)**2/4.0 + (maxy-miny)**2/4.0)
 
-	nb_intvals = 30
+	nb_intvals = 40
 	sep_set = []
 	seps_plot = []
 	for i in range(1, nb_intvals):
@@ -348,7 +348,7 @@ def generate_separators(HULL, depot):
 		bestX = []
 		bestY = []
 		bestsep = []
-		for alp in np.arange(0, 0.2,0.01):
+		for alp in np.arange(0, 0.7,0.01):
 			pivot1[0] = nearp1[0] * (1 - alp) + alp*center[0]
 			pivot1[1] = nearp1[1] * (1 - alp) + alp*center[1]
 			x3 = pivot1[0]  + 8 * math.cos(theta)
@@ -371,13 +371,13 @@ def generate_separators(HULL, depot):
 			# plot_hull(depot, HULL, [x3, x4], [y3, y4])
 		seps_plot.append([bestX, bestY])
 		sep_set.append(bestsep)
-		for alp in np.arange(0, 0.1,0.01):
+		for alp in np.arange(0, 0.7,0.01):
 			pivot2[0] = nearp2[0] * (1 - alp) + alp*center[0]
 			pivot2[1] = nearp2[1] * (1 - alp) + alp*center[1]
-			x3 = pivot2[0]  + 4 * math.cos(theta)
-			y3 = pivot2[1]  +4 * math.sin(theta)
-			x4 = pivot2[0]  + 4 * math.cos(theta + math.pi)
-			y4 = pivot2[1]  + 4 * math.sin(theta + math.pi)
+			x3 = pivot2[0]  + 8 * math.cos(theta)
+			y3 = pivot2[1]  +8 * math.sin(theta)
+			x4 = pivot2[0]  + 8 * math.cos(theta + math.pi)
+			y4 = pivot2[1]  + 8 * math.sin(theta + math.pi)
 			a = (y4- y3)/(x4 - x3)
 			b = -1 
 			c = -a * x4 + y4
