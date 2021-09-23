@@ -114,8 +114,10 @@ if __name__ == "__main__":
 	# is_del = remove_redundance(X, Y, R)
 	# # print(is_del)
 	# plot_instance(X, Y, R, is_del)
-	X, Y, R = read_instance_Mennell(instance)
-	is_del = remove_redundance(X, Y, R)
-	plot_instance(X, Y, R, is_del)
+	
+
+	# X, Y, R = read_instance_Mennell(instance)
+	# is_del = remove_redundance(X, Y, R)
+	# plot_instance(X, Y, R, is_del)
 	# plot_instance_old(X, Y, R)
 
