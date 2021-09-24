@@ -40,6 +40,7 @@ class CvxPolygon:
 		line_ = rile.readline()
 		self._POINTS = []
 		self._HULLs = []
+		self._totalCvxPolygonarea = 0
 		while line_ != '':
 			str_ = re.split('\t|\n', line_)
 			pts = []
@@ -255,8 +256,10 @@ class CvxPolygon:
 						if not self.is_in_separators([px, py], sep_set):
 							cutoff_area += unitgridarea
 
-		print("grid area=", gridarea, "True polygon area = ", self._totalCvxPolygonarea, "estimated polygon area = ",estimated_area, "cutff = ", cutoff_area)
+		# print("grid area=", gridarea, "True polygon area = ", self._totalCvxPolygonarea, "estimated polygon area = ",estimated_area, "cutff = ", cutoff_area)
+		return self._totalCvxPolygonarea, estimated_area, cutoff_area
 
+		
 	def is_in_separators(self, point, sep_set):
 		flag = True
 		for hs in sep_set:
@@ -293,7 +296,7 @@ class CvxPolygon:
 		# print(pset)
 		big_hull = ConvexHull(pset)
 		# plot_hull(Hulls, big_hull)
-		self.plot_hull_temp(depot, Hulls)
+		# self.plot_hull_temp(depot, Hulls)
 
 	def plot_hull_temp(self, depot, Hulls):
 		fig = plt.figure()
@@ -336,6 +339,26 @@ class CvxPolygon:
 			index += 1
 		file.close()
 
+def create_instances_set():
+	path = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/"
+	NBCVXP = [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
+	for nb in NBCVXP:
+		for i in range(1, 11):
+			cvxpsize = 1
+			cvp = CvxPolygon('convex_polyon')
+			cvp.generate_convex_polygons(nb, cvxpsize, path+'cvxp_'+str(nb)+'_'+str(i))
+		for i in range(11, 21):
+			cvxpsize = 2
+			cvp = CvxPolygon('convex_polyon')
+
+			cvp.generate_convex_polygons(nb, cvxpsize, path+'cvxp_'+str(nb)+'_'+str(i))
+		for i in range(21, 31):
+			cvxpsize = 3
+			cvp = CvxPolygon('convex_polyon')
+			cvp.generate_convex_polygons(nb, cvxpsize, path+'cvxp_'+str(nb)+'_'+str(i))
+
+
+
 
 if __name__ == "__main__":
 
@@ -343,23 +366,12 @@ if __name__ == "__main__":
 	nb_cvxp = argv[1]
 	index = argv[2]
 	''' create instance object '''
-	instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai/cvxp_" + nb_cvxp + "_" + index
+	instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/cvxp_" + nb_cvxp + "_" + index
 	cvp = CvxPolygon('convex_polyon_'+ 'nb_cvx_polygon= '+ nb_cvxp +' index= '+index)
-	# cvp.read_cvxp_instance(instance)
-	# sep_set= cvp.generate_separators(10)
-	# cvp.evaluate_separators(sep_set)
-	# cvp.plot_hull()
+	cvp.read_cvxp_instance(instance)
+	sep_set= cvp.generate_separators(10)
+	cvp.evaluate_separators(sep_set)
+	cvp.plot_hull()
 
 
-
-	cvp.generate_convex_polygons(16, 3, 'cvxp_tmp')
-
-	# depot, HULL = read_cvxp_instance(instance)
-	# # convert_HULL_LPConsts(HULL)
-	# # print(HULL[0].vertices)
-	# # halfspace = [-1, -1, 6.7]
-	# # is_projclosed_single(HULL[3], halfspace)
-	# # is_projclosed(HULL, halfspace)
-	# # generate_separators(HULL,depot)
-	# plot_hull(depot, HULL)
-	# # calc_zbar(depot, HULL)
+	# create_instances_set()
