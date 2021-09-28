@@ -25,11 +25,11 @@ class CvxPolygon:
 
 	def __init__(self, instance):
 		self._name = instance
-		self.name = ''
 		self._POINTS = []
 		self._HULLs = []
 		self._SEPs = []
 		self._totalCvxPolygonarea = 0
+		self._nb_cvxps = 0
 		
 	def read_cvxp_instance(self, instance):
 		nb_cvxp = int(re.split('/', instance)[-1].split('_')[1])
@@ -42,6 +42,7 @@ class CvxPolygon:
 		self._POINTS = []
 		self._HULLs = []
 		self._totalCvxPolygonarea = 0
+		self._nb_cvxps = 0
 		while line_ != '':
 			str_ = re.split('\t|\n', line_)
 			pts = []
@@ -53,6 +54,7 @@ class CvxPolygon:
 			hull = ConvexHull(np.array(pts))
 			self._totalCvxPolygonarea += hull.volume
 			self._HULLs.append(hull)
+			self._nb_cvxps += 1
 			line_ = rile.readline()
 
 	def plot_hull(self, seps_plot=[]):
@@ -88,7 +90,6 @@ class CvxPolygon:
 		plt.show()
 
 	
-
 	def generate_separators(self, nb_intvals = 20 ):
 		# ---> Step 1: find the center of the smallest horizontal rectangle that contains all polygon vertices
 		minx, maxx, miny, maxy = self._depot[0], self._depot[0], self._depot[1], self._depot[1]
