@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as pch
 import networkx as nx
+import timeit
 
 
 import InstanceReader
@@ -16,7 +17,7 @@ import CutPool
 
 class MINLP:
 
-	def __init__(self, inst, SD, mode='1-M-1'):
+	def __init__(self, inst, SD, mode='M-M'):
 		self._instance = inst
 		self._SD = SD
 		self._mode = mode
@@ -24,6 +25,7 @@ class MINLP:
 		self._HULLs = inst._HULLs
 		self._SEPs = inst._SEPs
 		self._nb_tars = inst._nb_cvxps
+
 
 	def _solve(self):
 		try:
@@ -34,12 +36,15 @@ class MINLP:
 			self._set_parameter(model)
 
 			'''Initialize GRBmodel input '''
-			model._nb_SECs = 0
-			model._nb_GBCs = 0
+			model._nb_SECs, model._nb_SDCs, model._nb_GBCs = 0, 0, 0
+			model._time_SECs, model._time_SDCs, model._time_GBCs = 0, 0, 0
+
 			model._size = self._nb_tars + 2  
 			model._depot1, model._depot2 = self._depot, self._depot
+			model._SD = self._SD
 			model._zbar = self._calc_zbar()
 			model._LPC = self._convert_HULL_LPConsts()
+			model._mode = self._mode
 
 			'''Add binary variables to the model'''
 			self._add_vars(model)
@@ -48,14 +53,19 @@ class MINLP:
 			self._set_objective(model)
 			
 			'''Add constraints to the model'''
-			self._set_constraints(model)			
+			self._set_constraints(model)
+
+			if model._mode == '1-1': self._set_precedence_constraints(model) 			
 
 			'''Optimize the model with Callback function ''' 
 			model.optimize(MINLP.callback_GBD)
 
 			'''Terminate the model and output the results '''
 			self._terminate(model)
-			
+			'''Plot the optimal tour '''
+
+			self._plot_wOptTour_M_M(model._opt_seq, model._opt_tour) if model._mode == 'M-M' else self._plot_wOptTour_1_1(model._opt_seq, model._opt_tour)
+
 		except gp.GurobiError as e:
 			print('Error code ' + str(e.errno) + ': ' + str(e))
 		except AttributeError:
@@ -98,6 +108,49 @@ class MINLP:
 			model._varE[i,i].ub = 0.0
 		model.update()
 	
+	def _set_precedence_constraints(self, model):
+		# model._varG = model.addVars(model._size, model._size,vtype= GRB.CONTINUOUS, name="G")
+		# for i in range(model._size -1):
+		# 	model._varG[i,i].ub = 0.0
+		# 	for j in range(1, model._size):
+		# 		if i != j:
+		# 			# model.addConstr(model._varE[j,i] + model._varG[i,j] <= 1.0, 'C11_T0_'+str(i)+'_'+str(j))
+		# 			model.addConstr(model._varE[i,j] <= model._varG[i,j], 'C11_T1_'+str(i)+'_'+str(j))
+		# 			for k in range(1, model._size-1):
+		# 				if i != k and j != k:
+		# 					model.addConstr(model._varG[i, k]+model._varG[k, j]-1 <= model._varG[i,j], 'C11_T2_'+str(i)+','+str(j)+','+str(k))
+		# 	model.update()
+
+		# for i in range(int(self._nb_tars/2)):
+		# 	pair = self._SD[i+1]
+		# 	model._varG[pair[1],pair[0]].ub = 0.0
+		# 	model._varG[pair[0],pair[1]].lb = 1.0
+		# model.update()
+
+		nb_pairs = len(model._SD) - 2					
+		model._varF = model.addVars(nb_pairs, model._size, model._size, lb=0.0, ub=1.0, vtype= GRB.CONTINUOUS, name="F")
+		for k in range(nb_pairs):
+			for i in range(1, model._size-1):
+				constrIN = 0
+				constrOUT = 0
+				for j in range(1, model._size-1):
+					constrOUT += model._varF[k, i, j]
+					constrIN += model._varF[k, j, i]
+				if i == model._SD[k+1][0]:
+					model.addConstr(constrOUT == 1, 's_F'+str(k)+'_'+str(i))
+				if i == model._SD[k+1][1]:
+					model.addConstr(constrIN  == 1, 't_F'+str(k)+'_'+str(i))
+				if i != model._SD[k+1][0] and i != model._SD[k+1][1]:
+					model.addConstr(constrIN - constrOUT == 0, '!st_F'+str(k)+'_'+str(i))
+			model.update()
+
+		for k in range(nb_pairs):
+			for i in range(model._size):
+				for j in range(model._size):
+					model.addConstr(model._varF[k,i,j] <= model._varE[i,j], 'F_UB'+ str(k)+'_'+str(i)+'_'+str(j))
+			model.update()
+
+
 	def _terminate(self, model):
 		if model.status == GRB.OPTIMAL or model.status == GRB.TIME_LIMIT:
 			curObj = np.zeros((model._size, model._size))
@@ -108,15 +161,84 @@ class MINLP:
 				# print('\n',end='')
 
 			cirset, curBestSeq = MINLP.find_all_subtours(curObj, model._size)
-			# print(curBestSeq)
+			print(curBestSeq)
 
 			optTour, objLen = CutPool.solve_SOCP_CvxPolyNgbs(model, curBestSeq)
-			self._plot_CvxPoly_Instance_wOptTour(optTour)
-			# print(model._nb_SECs, '& ', 
-			# 	  model._nb_GBCs, '& ', 
-			# 	  '{:.2f}'.format(model.Runtime), '& ', 
-			# 	  '{:.2f}'.format(model.MIPGap), '& ', 
-			# 	  '{:.4f}'.format(objLen))
+			model._opt_seq = curBestSeq
+			model._opt_tour = optTour
+			model._opt_objval = objLen
+			self._print_results(model)
+			
+
+	def _print_results(self, model):
+		ret = {'nb_SECs': model._nb_SECs, 
+			   'nb_SDCs': model._nb_SDCs, 
+			   'nb_GBCs': model._nb_GBCs,
+			   'Time_SECs': model._time_SECs,
+			   'Time_SDCs': model._time_SDCs,
+			   'Time_GBCs': model._time_GBCs,
+			   'Model Time': model.Runtime,
+			   'MIPGap': model.MIPGap,
+			   'ObjVal': model._opt_objval}
+		print(ret)
+
+	@staticmethod		
+	def callback_GBD(model, where):
+		if where == GRB.Callback.MIPSOL:
+			vals = model.cbGetSolution(model._varE)
+			if False:
+				for i in range(model._size):
+					for j in range(model._size):
+						print(vals[i,j],end=' ')
+					print(end='\n')
+			
+			''' 
+				Cirset is the list of subtours if exists. Otherwise, it is empty list
+				fseq is a list of full feasible hamiltonian path if exists, otherwise, it is empty list
+			'''
+			Cirset,fseq = MINLP.find_all_subtours(vals, model._size)			
+			
+			if model._mode == 'CETSP':
+				if len(Cirset) != 0:
+					MINLP.generate_smallest_SECs(Cirset, model)
+				if len(fseq) != 0:
+					mu0, mu1, obj = CutPool.generate_GBC_CvxPolyNgbs(model, fseq)
+					constr = 0
+					for el in mu1:
+						constr += el[2] * (model._varE[el[0],el[1]] - 1.0)
+					model.cbLazy(obj + constr <= model._theta)
+					model._nb_GBCs += 1
+
+			if model._mode == 'M-M':
+				feasible_tour = MINLP.generate_SEC_SDC_M_M(Cirset, fseq, model)
+				if feasible_tour:
+					start_time = timeit.default_timer()
+					mu0, mu1, obj = CutPool.generate_GBC_CvxPolyNgbs(model, fseq)
+					constr = 0
+					for el in mu1:
+						constr += el[2] * (model._varE[el[0],el[1]] - 1.0)
+					model.cbLazy(obj + constr <= model._theta)
+					end_time = timeit.default_timer()
+					model._time_GBCs += end_time - start_time
+					model._nb_GBCs += 1
+
+			if model._mode == '1-1':
+				if len(Cirset) != 0:
+					start_time = timeit.default_timer()
+					MINLP.generate_smallest_SECs(Cirset, model)
+					end_time = timeit.default_timer()
+					model._time_SECs += end_time - start_time
+				if len(fseq) != 0:
+					start_time = timeit.default_timer()
+					mu0, mu1, obj = CutPool.generate_GBC_CvxPolyNgbs(model, fseq)
+					constr = 0
+					for el in mu1:
+						constr += el[2] * (model._varE[el[0],el[1]] - 1.0)
+					model.cbLazy(obj + constr <= model._theta)
+					model._nb_GBCs += 1
+					end_time = timeit.default_timer()
+					model._time_GBCs += end_time - start_time
+
 
 	@staticmethod
 	def find_all_subtours(curSol, matsize):
@@ -156,6 +278,119 @@ class MINLP:
 					break
 		
 		return Cirset,fseq
+
+	@staticmethod
+	def generate_SEC_SDC_M_M(Cirset, fseq, model):
+		feasible_tour = True
+		''' case I: subtour exists '''
+		if len(Cirset) != 0: 
+			start_time = timeit.default_timer()
+			subtour0 = Cirset[0]
+			feasible_tour = False
+			sum_sd, constr = 0, 0
+			s = 0
+			while s < len(subtour0)-1:
+				sum_sd += model._SD[subtour0[s+1]]
+				constr += model._varE[subtour0[s],subtour0[s+1]]
+				if sum_sd < 0:
+					model.cbLazy(constr <= s)
+					model._nb_SDCs += 1
+					break
+				s += 1
+			end_time = timeit.default_timer()
+			model._time_SDCs += end_time - start_time
+
+			# if s == len(subtour0)-1:
+			# 	constr += model._varE[subtour0[-1], subtour0[0]]
+			# 	model.cbLazy(constr <= len(subtour0)-1)
+			# 	model._nb_SECs += 1	
+
+			start_time = timeit.default_timer()
+			MINLP.generate_smallest_SECs(Cirset, model)
+			end_time = timeit.default_timer()
+			model._time_SECs += end_time - start_time
+
+		''' case II: a full-length Hamiltonian path '''
+		if len(fseq) != 0:
+			sum_sd, constr = 0, 0
+			s = 0
+			start_time = timeit.default_timer()
+
+			while s < model._size-1:
+				sum_sd += model._SD[fseq[s+1]]
+				constr += model._varE[fseq[s],fseq[s+1]]
+				if sum_sd < 0:
+					feasible_tour = False
+					model.cbLazy(constr <= s)
+					model._nb_SDCs += 1
+					break
+				s += 1
+			end_time = timeit.default_timer()
+			model._time_SDCs += end_time - start_time
+		return feasible_tour
+
+	@staticmethod
+	def generate_SEC_SDC_1_1(Cirset, fseq, model):
+		feasible_tour = True
+		''' case I: subtour exists '''
+		if len(Cirset) != 0: 
+			start_time = timeit.default_timer()
+			subtour0 = Cirset[0]
+			feasible_tour = False
+			sum_sd, constr = 0, 0
+			s = 0
+			while s < len(subtour0)-1:
+				sum_sd += model._SD[subtour0[s+1]]
+				constr += model._varE[subtour0[s],subtour0[s+1]]
+				if sum_sd < 0:
+					model.cbLazy(constr <= s)
+					model._nb_SDCs += 1
+					break
+				s += 1
+			end_time = timeit.default_timer()
+			model._time_SDCs += end_time - start_time
+
+			start_time = timeit.default_timer()
+			MINLP.generate_smallest_SECs(Cirset, model)
+			end_time = timeit.default_timer()
+			model._time_SECs += end_time - start_time
+
+		''' case II: a full-length Hamiltonian path '''
+		if len(fseq) != 0:
+			sum_sd, constr = 0, 0
+			s = 0
+			start_time = timeit.default_timer()
+
+			while s < model._size-1:
+				sum_sd += model._SD[fseq[s+1]]
+				constr += model._varE[fseq[s],fseq[s+1]]
+				if sum_sd < 0:
+					feasible_tour = False
+					model.cbLazy(constr <= s)
+					model._nb_SDCs += 1
+					break
+				s += 1
+			end_time = timeit.default_timer()
+			model._time_SDCs += end_time - start_time
+		return feasible_tour
+
+	@staticmethod
+	def generate_smallest_SECs(Cirset, model):
+		if (len(Cirset) != 0):
+			# for circle in Cirset:
+			smalllens = float('inf')
+			smallindex = -1
+			for i in range(len(Cirset)):
+				if len(Cirset[i]) < smalllens:
+					smalllens = len(Cirset[i])
+					smallindex = i
+			circle = Cirset[smallindex]	
+			constr = 0
+			for i in range(0,len(circle)-1):
+				constr += model._varE[circle[i],circle[i+1]]
+			constr += model._varE[circle[-1],circle[0]]
+			model.cbLazy(constr <= len(circle)-1)
+			model._nb_SECs  += 1
 
 	def _calc_zbar(self):
 		# self._nb_tars = len(self._HULLs)
@@ -277,7 +512,7 @@ class MINLP:
 				pA = a0 + (_A * dot)
 		return pA,pB,np.linalg.norm(pA-pB)
 
-	def _plot_CvxPoly_Instance_wOptTour(self, optTour):
+	def _plot_wOptTour_M_M(self, curBestSeq, optTour):
 		fig = plt.figure()
 		ax = fig.add_subplot(111)
 		ax.set_aspect('equal', adjustable='box')
@@ -290,8 +525,13 @@ class MINLP:
 		plt.ylabel('y', fontsize=18)
 		ax.tick_params(axis='both', labelsize=16)
 		ax.set_aspect('equal', adjustable='box')
-
 		plt.plot(self._depot[0], self._depot[1], 'rs', ms=10)
+		accLoad = []
+		sum_sd = 0
+		for el in curBestSeq:
+			sum_sd += self._SD[el]
+			accLoad.append(sum_sd)
+		plt.title('Optimal tour = ' + str(curBestSeq))
 		for hull in self._HULLs:
 			for simplex in hull.simplices:
 				plt.plot(hull.points[simplex, 0], hull.points[simplex, 1], 'k-')
@@ -300,75 +540,45 @@ class MINLP:
 				cy = np.mean(hull.points[hull.vertices,1])
 					#Plot centroid
 				plt.plot(cx, cy,'ko',ms=2)
-			ax.annotate(str(itr), xy=(cx, cy),textcoords="offset points", xytext=(cx, cy),size=14)
+			# ax.annotate(str(itr), xy=(cx, cy),textcoords="offset points", xytext=(cx, cy),size=14)
+			bbox = dict(boxstyle ="round", fc ="0.8")
+			cl = accLoad[curBestSeq.index(itr)]
+			ax.annotate('id='+str(itr)+'\nsd=' + str(self._SD[itr])+'\ncl='+str(cl), xy=(cx+0.1, cy+0.1),textcoords="offset points", bbox = bbox, xytext=(cx, cy),size=10)
+
 			itr += 1
 		plt.plot(optTour[:,0],optTour[:,1], linestyle='-', color = 'blue', markersize=3, lw=2)
 		plt.show()
-	
-	@staticmethod		
-	def callback_GBD(model, where):
-		if where == GRB.Callback.MIPSOL:
-			vals = model.cbGetSolution(model._varE)
-			if False:
-				for i in range(model._size):
-					for j in range(model._size):
-						print(vals[i,j],end=' ')
-					print(end='\n')
 
-			# find_Subtour(vals, model._size)
-			Cirset,fseq = MINLP.find_all_subtours(vals, model._size)
-			# print(Cirset,fseq)
-			if (len(Cirset) != 0):
-				# for circle in Cirset:
-				smalllens = float('inf')
-				smallindex = -1
-				for i in range(len(Cirset)):
-					if len(Cirset[i]) < smalllens:
-						smalllens = len(Cirset[i])
-						smallindex = i
-				circle = Cirset[smallindex]	
-				constr = 0
-				for i in range(0,len(circle)-1):
-					constr += model._varE[circle[i],circle[i+1]]
-				constr += model._varE[circle[-1],circle[0]]
-				model.cbLazy(constr <= len(circle)-1)
-				model._nb_SECs  += 1
-			else:
-				# '''supply_demand balance check '''
-				# SD_balanced = True
-				# for i in range(1, model._size):
-				# 	sum_sd = 0
-				# 	for j in range(0, i):
-				# 		sum_sd += model._SD[fseq[j]]
-				# 	if sum_sd < 0:
-				# 		# print(sum_sd)
-				# 		SD_balanced = False
-				# 		break
-				# if not SD_balanced:
-				# # if False:
-				# 	constr = 0
-				# 	# print(fseq)
-				# 	for i in range(0, model._size-1):
-				# 		constr += model._varE[fseq[i],fseq[i+1]]
-				# 		# print(fseq[i],fseq[i+1], end=', ')
-				# 	# print('')
-				# 	model.cbLazy(constr <= model._size-2)
-				
+	def _plot_wOptTour_1_1(self, curBestSeq, optTour):
+		fig = plt.figure()
+		ax = fig.add_subplot(111)
+		ax.set_aspect('equal', adjustable='box')
+		itr = 1
+		cx = 0
+		cy = 0
+		# ax.set_xlim([0, 17])
+		# ax.set_ylim([0, 14])
+		plt.xlabel('x', fontsize=18)
+		plt.ylabel('y', fontsize=18)
+		ax.tick_params(axis='both', labelsize=16)
+		ax.set_aspect('equal', adjustable='box')
+		plt.plot(self._depot[0], self._depot[1], 'rs', ms=10)
+		plt.title('Optimal tour = ' + str(curBestSeq) + '\nSD pair=' + str(self._SD))
+		for hull in self._HULLs:
+			for simplex in hull.simplices:
+				plt.plot(hull.points[simplex, 0], hull.points[simplex, 1], 'k-')
+				# centroid
+				cx = np.mean(hull.points[hull.vertices,0])
+				cy = np.mean(hull.points[hull.vertices,1])
+					#Plot centroid
+				plt.plot(cx, cy,'ko',ms=2)
+			# ax.annotate(str(itr), xy=(cx, cy),textcoords="offset points", xytext=(cx, cy),size=14)
+			bbox = dict(boxstyle ="round", fc ="0.8")
+			ax.annotate('id='+str(itr), xy=(cx+0.1, cy+0.1),textcoords="offset points", bbox = bbox, xytext=(cx, cy),size=10)
 
-				# 	# print('....addded ')
-				# else:
-				# optTour, objLen = CutPool.solve_SOCP_Disc(self._depot, Ox, Oy, Or, fseq)
-				# # print(fseq, objLen)
-				# mu0, mu1, obj = CutPool.generate_GenOptimalityCut(model, fseq)
-				# print(mu0,mu1)
-				mu0, mu1, obj = CutPool.generate_GBC_CvxPolyNgbs(model, fseq)
-				constr = 0
-				for el in mu1:
-					constr += el[2] * (model._varE[el[0],el[1]] - 1.0)
-				# for el in mu0:
-				# 	constr += el[2] * (model._varE[el[0],el[1]] - 0.0)
-				model.cbLazy(obj + constr <= model._theta)
-				model._nb_GBCs += 1
+			itr += 1
+		plt.plot(optTour[:,0],optTour[:,1], linestyle='-', color = 'blue', markersize=3, lw=2)
+		plt.show()
 	
 	def _convert_HULL_LPConsts(self):
 		LPC = []
@@ -384,7 +594,6 @@ class MINLP:
 				A = np.vstack([x_coords,np.ones(len(x_coords))]).T
 				m, c = np.linalg.lstsq(A, y_coords,rcond=None)[0]
 				# print("Line Solution is y = {m}x + {c}".format(m=m,c=c))
-				
 				if m * cx + c < cy:
 					lpc.append([m, -1, c])
 				else:
@@ -394,11 +603,15 @@ class MINLP:
 		return LPC
 
 if __name__ == "__main__":
+	mode = argv[1]
 
 	filepath = 'C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/'
-	instancename = 'cvxp_10_22'
+	instancename = 'cvxp_20_7'
 	inst = InstanceReader.CvxPolygon(instancename)
 	inst.read_cvxp_instance(filepath + instancename)
-	SD = []
-	mdl = MINLP(inst, SD, mode='M-M')
+	SD_cvxp10 = [0,3, 2, 3, -1, -3, 5, -4, 4, -5, -3, 0]
+	SD_cvxp20 = [0, 5, 2, 3, -1, -3, 5, -10, 4, -8, 3, 5, 2, 3, -1, -3, 5, -10, 4, -8, 3, 0]
+	SD_cvxp10_pair = [0, (1,4), (9,2), (3, 7), (5, 8), (6,10), 11]
+	SD_cvxp20_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), 21]
+	mdl = MINLP(inst, SD_cvxp20, mode)
 	mdl._solve()

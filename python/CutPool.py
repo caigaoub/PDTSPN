@@ -584,7 +584,7 @@ def solve_SOCP_CvxPolyNgbs(model, fseq):
 			for i in range(1, nb_tars+1):
 				optTour.append([varX[fseq[i]-1].x, varY[fseq[i]-1].x])
 			optTour.append(model._depot2)
-			print(optTour)
+			# print(optTour)
 			optTour = np.array(optTour)
 			return optTour, SP_m.objVal
 
