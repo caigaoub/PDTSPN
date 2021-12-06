@@ -1,3 +1,4 @@
+''' python package '''
 import gurobipy as gp
 from gurobipy import GRB
 from itertools import combinations
@@ -10,32 +11,38 @@ import matplotlib.patches as pch
 import networkx as nx
 import timeit
 
-
+''' self-defined python class/funcions ''' 
 import InstanceReader
 import CutPool
 
+'''
+	@Class PDTSPNModel is defined for solving 1-1/M-M mode Pickup and Delivery Traveling Salesman Problem 
+	with Neighborhoods (PDTSPN). 
+	@Author Cai Gao
+	@Date 9/1/2020
+ '''
 
-class MINLP:
-
+class PDTSPNModel:
+	''' Constructor '''
 	def __init__(self, inst, SD, mode='M-M'):
-		self._instance = inst
-		self._SD = SD
-		self._mode = mode
-		self._depot = inst._depot
-		self._HULLs = inst._HULLs
-		self._SEPs = inst._SEPs
-		self._nb_tars = inst._nb_cvxps
-
-
+		self._instance 	= inst 				# instance name
+		self._SD 		= SD                # supply-demand list
+		self._mode 		= mode              # problem mode: CETSP, 1-1 or M-M
+		self._depot 	= inst._depot       # depot position 
+		self._HULLs 	= inst._HULLs       # convex neighborhoods  
+		self._SEPs 		= inst._SEPs        # boundary-projection-closed separators
+		self._nb_tars 	= inst._nb_cvxps    # number of neighborhoods/targets
+	
+	''' Mixed-integer nonlinear programming model, solved by Generalized Benders Decomposition` '''
 	def _solve(self):
 		try:
 			'''Create a new model'''
-			model = gp.Model("GBD_PDTSPN")
+			model = gp.Model("PDTSPNModel_GBD")
 
 			'''Set up GRBmodel parameters '''
 			self._set_parameter(model)
 
-			'''Initialize GRBmodel input '''
+			'''Initialize GRBmodel output'''
 			model._nb_SECs, model._nb_SDCs, model._nb_GBCs = 0, 0, 0
 			model._time_SECs, model._time_SDCs, model._time_GBCs = 0, 0, 0
 
@@ -58,7 +65,7 @@ class MINLP:
 			if model._mode == '1-1': self._set_precedence_constraints(model) 			
 
 			'''Optimize the model with Callback function ''' 
-			model.optimize(MINLP.callback_GBD)
+			model.optimize(PDTSPNModel.callback_GBD)
 
 			'''Terminate the model and output the results '''
 			self._terminate(model)
@@ -71,16 +78,19 @@ class MINLP:
 		except AttributeError:
 			print('Encountered an attribute error')
 
+	''' Set Gurobi model parameters '''
 	def _set_parameter(self, model):
 		model.setParam(GRB.Param.OutputFlag, 1)
-		# model.setParam(GRB.Param.TimeLimit, 10.0)
+		model.setParam(GRB.Param.TimeLimit, 3600.0)
 		model.Params.lazyConstraints = 1
 
+	''' add model variables '''
 	def _add_vars(self, model):
 		model._varE = model.addVars(model._size, model._size, vtype=GRB.BINARY, name="E")
 		model._theta = model.addVar(lb=0.0, vtype=GRB.CONTINUOUS, name="theta")
 		model.update()
 
+	''' set model objective function '''
 	def _set_objective(self, model):
 		obj = 0
 		for i in range(model._size):
@@ -90,6 +100,7 @@ class MINLP:
 		model.setObjective(obj, GRB.MINIMIZE)
 		model.update()
 
+	''' add TSP-related constraints  '''
 	def _set_constraints(self, model):
 		for i in range(0, model._size):
 			constr1 = 0
@@ -108,6 +119,7 @@ class MINLP:
 			model._varE[i,i].ub = 0.0
 		model.update()
 	
+	''' add preceduence constraints to the model if model is in 1-1 mode'''
 	def _set_precedence_constraints(self, model):
 		# model._varG = model.addVars(model._size, model._size,vtype= GRB.CONTINUOUS, name="G")
 		# for i in range(model._size -1):
@@ -151,6 +163,7 @@ class MINLP:
 			model.update()
 
 
+	''' terminate the model if the model reaches optimality or time limit '''
 	def _terminate(self, model):
 		if model.status == GRB.OPTIMAL or model.status == GRB.TIME_LIMIT:
 			curObj = np.zeros((model._size, model._size))
@@ -160,7 +173,7 @@ class MINLP:
 					# print(varE[i,j].x, end=' ')
 				# print('\n',end='')
 
-			cirset, curBestSeq = MINLP.find_all_subtours(curObj, model._size)
+			cirset, curBestSeq = PDTSPNModel.find_all_subtours(curObj, model._size)
 			print(curBestSeq)
 
 			optTour, objLen = CutPool.solve_SOCP_CvxPolyNgbs(model, curBestSeq)
@@ -169,7 +182,7 @@ class MINLP:
 			model._opt_objval = objLen
 			self._print_results(model)
 			
-
+	''' use a dictionary to hold all results '''
 	def _print_results(self, model):
 		ret = {'nb_SECs': model._nb_SECs, 
 			   'nb_SDCs': model._nb_SDCs, 
@@ -182,6 +195,8 @@ class MINLP:
 			   'ObjVal': model._opt_objval}
 		print(ret)
 
+
+	''' Generalized benders cuts added for different modes - CETSP, 1-1 and M-M '''
 	@staticmethod		
 	def callback_GBD(model, where):
 		if where == GRB.Callback.MIPSOL:
@@ -196,11 +211,11 @@ class MINLP:
 				Cirset is the list of subtours if exists. Otherwise, it is empty list
 				fseq is a list of full feasible hamiltonian path if exists, otherwise, it is empty list
 			'''
-			Cirset,fseq = MINLP.find_all_subtours(vals, model._size)			
+			Cirset,fseq = PDTSPNModel.find_all_subtours(vals, model._size)			
 			
 			if model._mode == 'CETSP':
 				if len(Cirset) != 0:
-					MINLP.generate_smallest_SECs(Cirset, model)
+					PDTSPNModel.generate_smallest_SECs(Cirset, model)
 				if len(fseq) != 0:
 					mu0, mu1, obj = CutPool.generate_GBC_CvxPolyNgbs(model, fseq)
 					constr = 0
@@ -210,7 +225,7 @@ class MINLP:
 					model._nb_GBCs += 1
 
 			if model._mode == 'M-M':
-				feasible_tour = MINLP.generate_SEC_SDC_M_M(Cirset, fseq, model)
+				feasible_tour = PDTSPNModel.generate_SEC_SDC_M_M(Cirset, fseq, model)
 				if feasible_tour:
 					start_time = timeit.default_timer()
 					mu0, mu1, obj = CutPool.generate_GBC_CvxPolyNgbs(model, fseq)
@@ -225,7 +240,7 @@ class MINLP:
 			if model._mode == '1-1':
 				if len(Cirset) != 0:
 					start_time = timeit.default_timer()
-					MINLP.generate_smallest_SECs(Cirset, model)
+					PDTSPNModel.generate_smallest_SECs(Cirset, model)
 					end_time = timeit.default_timer()
 					model._time_SECs += end_time - start_time
 				if len(fseq) != 0:
@@ -306,7 +321,7 @@ class MINLP:
 			# 	model._nb_SECs += 1	
 
 			start_time = timeit.default_timer()
-			MINLP.generate_smallest_SECs(Cirset, model)
+			PDTSPNModel.generate_smallest_SECs(Cirset, model)
 			end_time = timeit.default_timer()
 			model._time_SECs += end_time - start_time
 
@@ -351,7 +366,7 @@ class MINLP:
 			model._time_SDCs += end_time - start_time
 
 			start_time = timeit.default_timer()
-			MINLP.generate_smallest_SECs(Cirset, model)
+			PDTSPNModel.generate_smallest_SECs(Cirset, model)
 			end_time = timeit.default_timer()
 			model._time_SECs += end_time - start_time
 
@@ -392,6 +407,7 @@ class MINLP:
 			model.cbLazy(constr <= len(circle)-1)
 			model._nb_SECs  += 1
 
+	''' calculate the distance between neighborhoods, which is used as objective coefficient '''
 	def _calc_zbar(self):
 		# self._nb_tars = len(self._HULLs)
 		if self._nb_tars <= 0:
@@ -580,6 +596,7 @@ class MINLP:
 		plt.plot(optTour[:,0],optTour[:,1], linestyle='-', color = 'blue', markersize=3, lw=2)
 		plt.show()
 	
+	''' Convert the convex hull as linear constraints '''
 	def _convert_HULL_LPConsts(self):
 		LPC = []
 		for hull in self._HULLs:
@@ -606,12 +623,17 @@ if __name__ == "__main__":
 	mode = argv[1]
 
 	filepath = 'C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/'
-	instancename = 'cvxp_20_7'
+	instancename = 'cvxp_10_12'
 	inst = InstanceReader.CvxPolygon(instancename)
 	inst.read_cvxp_instance(filepath + instancename)
 	SD_cvxp10 = [0,3, 2, 3, -1, -3, 5, -4, 4, -5, -3, 0]
 	SD_cvxp20 = [0, 5, 2, 3, -1, -3, 5, -10, 4, -8, 3, 5, 2, 3, -1, -3, 5, -10, 4, -8, 3, 0]
+	SD_cvxp24 = [0, 5, 2, 3, 1, -5, 5, -10, 4, -8, 3, 5, 2, 3, +1, -5, 5, -10, 4, -16, 3, 6, 4, -4, 2, 0]
 	SD_cvxp10_pair = [0, (1,4), (9,2), (3, 7), (5, 8), (6,10), 11]
 	SD_cvxp20_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), 21]
-	mdl = MINLP(inst, SD_cvxp20, mode)
+	SD_cvxp30_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,29), (23, 27), (25, 28), (26,30), 31]
+	SD_cvxp26_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,25), (23, 26), 27]
+	SD_cvxp24_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,23), 25]
+
+	mdl = PDTSPNModel(inst, SD_cvxp10, mode)
 	mdl._solve()

@@ -1,13 +1,13 @@
 import gurobipy as gp
 from gurobipy import GRB
-from itertools import combinations
-from sys import argv
 import re
 import math
 import numpy as np
 import random
 import matplotlib.pyplot as plt
 import matplotlib.patches as pch
+from itertools import combinations
+from sys import argv
 from scipy.spatial import ConvexHull
 from scipy.spatial import Delaunay
 from matplotlib.path import Path
@@ -15,22 +15,27 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.ops import nearest_points
 
-''' -------------------------------------------------
-	Things done: create a class CvxPolygon
-	Date: 9/21/2021
-	-------------------------------------------------
+''' 
+	This "CvxPolygon" class is used to
+	* create new instances
+	* read instances from files
+	* visualize instances from files
+	* generate separators, calculation the statstics and visualize them
+
+	@Author Cai Gao  
+	@Date 9/1/2020
 '''
 
 class CvxPolygon:
 
 	def __init__(self, instance):
-		self._name = instance
-		self.name = ''
-		self._POINTS = []
-		self._HULLs = []
-		self._SEPs = []
-		self._totalCvxPolygonarea = 0
-		
+		self._name 					= 	instance
+		self.name 					= 	''
+		self._POINTS 				= 	[]
+		self._HULLs 				= 	[]
+		self._SEPs 					= 	[]
+		self._totalCvxPolygonarea 	= 	0
+			
 	def read_cvxp_instance(self, instance):
 		nb_cvxp = int(re.split('/', instance)[-1].split('_')[1])
 		rile = open(instance, "r")
@@ -345,16 +350,16 @@ def create_instances_set():
 	NBCVXP = [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
 	for nb in NBCVXP:
 		for i in range(1, 11):
-			cvxpsize = 1
+			cvxpsize = 0.75
 			cvp = CvxPolygon('convex_polyon')
 			cvp.generate_convex_polygons(nb, cvxpsize, path+'cvxp_'+str(nb)+'_'+str(i))
 		for i in range(11, 21):
-			cvxpsize = 2
+			cvxpsize = 1
 			cvp = CvxPolygon('convex_polyon')
 
 			cvp.generate_convex_polygons(nb, cvxpsize, path+'cvxp_'+str(nb)+'_'+str(i))
 		for i in range(21, 31):
-			cvxpsize = 3
+			cvxpsize = 1.25
 			cvp = CvxPolygon('convex_polyon')
 			cvp.generate_convex_polygons(nb, cvxpsize, path+'cvxp_'+str(nb)+'_'+str(i))
 
@@ -364,15 +369,15 @@ def create_instances_set():
 if __name__ == "__main__":
 
 	'''choose which instance by two parameters: nb of convex polygons and instance index  '''
-	nb_cvxp = argv[1]
-	index = argv[2]
-	''' create instance object '''
-	instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/cvxp_" + nb_cvxp + "_" + index
-	cvp = CvxPolygon('convex_polyon_'+ 'nb_cvx_polygon= '+ nb_cvxp +' index= '+index)
-	cvp.read_cvxp_instance(instance)
-	sep_set= cvp.generate_separators(10)
-	cvp.evaluate_separators(sep_set)
-	cvp.plot_hull()
+	# nb_cvxp = argv[1]
+	# index = argv[2]
+	# ''' create instance object '''
+	# instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/cvxp_" + nb_cvxp + "_" + index
+	# cvp = CvxPolygon('convex_polyon_'+ 'nb_cvx_polygon= '+ nb_cvxp +' index= '+index)
+	# cvp.read_cvxp_instance(instance)
+	# sep_set= cvp.generate_separators(10)
+	# cvp.evaluate_separators(sep_set)
+	# cvp.plot_hull()
 
 
-	# create_instances_set()
+	create_instances_set()
