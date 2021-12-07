@@ -302,6 +302,7 @@ def generate_GBC_CvxPolyNgbs(model, fseq):
 				# obj += vismat[i,j] * varZ[i,j]
 
 		SP_m.setObjective(obj, GRB.MINIMIZE)
+		SP_m.update()
 
 		# constraints - depot1
 		for i in range(model._size):
@@ -337,14 +338,21 @@ def generate_GBC_CvxPolyNgbs(model, fseq):
 					SP_m.addConstr(varS[i,j]*varS[i,j] + varT[i,j]*varT[i,j] <= varZ[i,j]*varZ[i,j], 'cZ_'+str(i)+str(j)) #constraint S
 			SP_m.update()
 
-		# # add convex polygon constraints 
+		# add convex polygon constraints 
 		idx = 0
-		# print(model._LPC)
 		for lpc in model._LPC:
 			for c in lpc:
-				SP_m.addConstr(c[0]*varX[idx]+c[1]*varY[idx] + c[2] <= 0)
+				SP_m.addConstr(c[0] * varX[idx] + c[1] * varY[idx] + c[2] <= 0)
 			idx += 1
 		SP_m.update()
+
+		# add boundary-projection-closed separators if exists
+		if model._BPC_sep_flag:
+			for sep in model._BPC_separators:
+				for k in range(nb_tars):
+					SP_m.addConstr(sep[0] * varX[k] + sep[1] * varY[k] + sep[2] <= 0)
+		SP_m.update()
+
 		SP_m.optimize()
 
 		''' ------------- model output  ----------------------'''

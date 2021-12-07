@@ -25,14 +25,22 @@ import CutPool
 class PDTSPNModel:
 	''' Constructor '''
 	def __init__(self, inst, SD, mode='M-M'):
-		self._instance 	= inst 				# instance name
-		self._SD 		= SD                # supply-demand list
-		self._mode 		= mode              # problem mode: CETSP, 1-1 or M-M
-		self._depot 	= inst._depot       # depot position 
-		self._HULLs 	= inst._HULLs       # convex neighborhoods  
-		self._SEPs 		= inst._SEPs        # boundary-projection-closed separators
-		self._nb_tars 	= inst._nb_cvxps    # number of neighborhoods/targets
-	
+		self._instance 		= inst 				# instance name
+		self._SD 			= SD                # supply-demand list
+		self._mode 			= mode              # problem mode: CETSP, 1-1 or M-M
+		self._depot 		= inst._depot       # depot position 
+		self._HULLs 		= inst._HULLs       # convex neighborhoods  
+		self._SEPs 			= inst._SEPs        # boundary-projection-closed separators
+		self._nb_tars 		= inst._nb_cvxps    # number of neighborhoods/targets
+		self._BPC_sep_flag 	= False 			# 
+		
+
+	''' add boundary-projection-closed separators to the model '''
+	def _add_BPC_separators(self, sep_set):
+		if len(sep_set) != 0:
+			self._BPC_sep_flag		= True		# flag of adding separators 
+			self._BPC_separators 	= sep_set
+
 	''' Mixed-integer nonlinear programming model, solved by Generalized Benders Decomposition` '''
 	def _solve(self):
 		try:
@@ -46,12 +54,18 @@ class PDTSPNModel:
 			model._nb_SECs, model._nb_SDCs, model._nb_GBCs = 0, 0, 0
 			model._time_SECs, model._time_SDCs, model._time_GBCs = 0, 0, 0
 
-			model._size = self._nb_tars + 2  
-			model._depot1, model._depot2 = self._depot, self._depot
-			model._SD = self._SD
-			model._zbar = self._calc_zbar()
-			model._LPC = self._convert_HULL_LPConsts()
-			model._mode = self._mode
+			model._depot1 		= self._depot
+			model._depot2 		= self._depot
+			model._size 		= self._nb_tars + 2  
+			model._SD 			= self._SD
+			model._zbar 		= self._calc_zbar()
+			model._LPC 			= self._convert_HULL_LPConsts()
+			model._mode 		= self._mode
+			model._BPC_sep_flag = self._BPC_sep_flag
+
+			if self._BPC_sep_flag:
+				model._BPC_sep_flag = self._BPC_sep_flag
+				model._BPC_separators = self._BPC_separators
 
 			'''Add binary variables to the model'''
 			self._add_vars(model)
@@ -61,7 +75,7 @@ class PDTSPNModel:
 			
 			'''Add constraints to the model'''
 			self._set_constraints(model)
-
+			
 			if model._mode == '1-1': self._set_precedence_constraints(model) 			
 
 			'''Optimize the model with Callback function ''' 
@@ -121,24 +135,6 @@ class PDTSPNModel:
 	
 	''' add preceduence constraints to the model if model is in 1-1 mode'''
 	def _set_precedence_constraints(self, model):
-		# model._varG = model.addVars(model._size, model._size,vtype= GRB.CONTINUOUS, name="G")
-		# for i in range(model._size -1):
-		# 	model._varG[i,i].ub = 0.0
-		# 	for j in range(1, model._size):
-		# 		if i != j:
-		# 			# model.addConstr(model._varE[j,i] + model._varG[i,j] <= 1.0, 'C11_T0_'+str(i)+'_'+str(j))
-		# 			model.addConstr(model._varE[i,j] <= model._varG[i,j], 'C11_T1_'+str(i)+'_'+str(j))
-		# 			for k in range(1, model._size-1):
-		# 				if i != k and j != k:
-		# 					model.addConstr(model._varG[i, k]+model._varG[k, j]-1 <= model._varG[i,j], 'C11_T2_'+str(i)+','+str(j)+','+str(k))
-		# 	model.update()
-
-		# for i in range(int(self._nb_tars/2)):
-		# 	pair = self._SD[i+1]
-		# 	model._varG[pair[1],pair[0]].ub = 0.0
-		# 	model._varG[pair[0],pair[1]].lb = 1.0
-		# model.update()
-
 		nb_pairs = len(model._SD) - 2					
 		model._varF = model.addVars(nb_pairs, model._size, model._size, lb=0.0, ub=1.0, vtype= GRB.CONTINUOUS, name="F")
 		for k in range(nb_pairs):
@@ -207,10 +203,10 @@ class PDTSPNModel:
 						print(vals[i,j],end=' ')
 					print(end='\n')
 			
-			''' 
-				Cirset is the list of subtours if exists. Otherwise, it is empty list
-				fseq is a list of full feasible hamiltonian path if exists, otherwise, it is empty list
-			'''
+			
+			# Cirset is the list of subtours if exists. Otherwise, it is empty list 
+			# fseq is a list of full feasible hamiltonian path if exists, otherwise, it is empty list
+			
 			Cirset,fseq = PDTSPNModel.find_all_subtours(vals, model._size)			
 			
 			if model._mode == 'CETSP':
@@ -622,10 +618,12 @@ class PDTSPNModel:
 if __name__ == "__main__":
 	mode = argv[1]
 
+	''' Step 1: read instances '''
 	filepath = 'C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/'
 	instancename = 'cvxp_10_12'
 	inst = InstanceReader.CvxPolygon(instancename)
 	inst.read_cvxp_instance(filepath + instancename)
+
 	SD_cvxp10 = [0,3, 2, 3, -1, -3, 5, -4, 4, -5, -3, 0]
 	SD_cvxp20 = [0, 5, 2, 3, -1, -3, 5, -10, 4, -8, 3, 5, 2, 3, -1, -3, 5, -10, 4, -8, 3, 0]
 	SD_cvxp24 = [0, 5, 2, 3, 1, -5, 5, -10, 4, -8, 3, 5, 2, 3, +1, -5, 5, -10, 4, -16, 3, 6, 4, -4, 2, 0]
@@ -635,5 +633,12 @@ if __name__ == "__main__":
 	SD_cvxp26_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,25), (23, 26), 27]
 	SD_cvxp24_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,23), 25]
 
+	''' Step 2: create model '''
 	mdl = PDTSPNModel(inst, SD_cvxp10, mode)
+
+	''' Step 3: generate boundary-projection-closed separators '''
+	sep_set = inst.generate_separators(10)
+	mdl._add_BPC_separators(sep_set)
+	
+	''' Step 4: solve the model '''
 	mdl._solve()

@@ -127,7 +127,7 @@ class CvxPolygon:
 				bestsep, endpoints = self.binary_search_separator(theta, farp2, center, 0, 1, sign=False)
 				seps_plot.append(endpoints)
 				sep_set.append(bestsep)
-		self.plot_hull(seps_plot=seps_plot)
+		# self.plot_hull(seps_plot=seps_plot)
 		self._SEPs = sep_set
 		return sep_set	
 

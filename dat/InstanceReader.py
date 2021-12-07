@@ -92,9 +92,15 @@ class CvxPolygon:
 			itr += 1
 		plt.show()
 
-	
 
+	''' 
+	 @function, Generate a collection of boundary-projection-closed separators 
+	 in the form of ax+by+c <= 0 
+	 @param, nb_intval, number of intervals that are used to devide 180 degress 
+
+	'''	
 	def generate_separators(self, nb_intvals = 20 ):
+
 		# ---> Step 1: find the center of the smallest horizontal rectangle that contains all polygon vertices
 		minx, maxx, miny, maxy = self._depot[0], self._depot[0], self._depot[1], self._depot[1]
 		pset = [] # store all vertices of the convex polygons
@@ -131,7 +137,7 @@ class CvxPolygon:
 				bestsep, endpoints = self.binary_search_separator(theta, farp2, center, 0, 1, sign=False)
 				seps_plot.append(endpoints)
 				sep_set.append(bestsep)
-		self.plot_hull(seps_plot=seps_plot)
+		# self.plot_hull(seps_plot=seps_plot)
 		self._SEPs = sep_set
 		return sep_set	
 
@@ -172,7 +178,6 @@ class CvxPolygon:
 			else:
 				rval = alp	
 		return bestsep, [bestX, bestY]
-
 
 	def farthest_points_twosides(self, pset, halfspace):
 		fardist1, fardist2 = 0, 0
@@ -345,6 +350,11 @@ class CvxPolygon:
 			index += 1
 		file.close()
 
+''' 
+  @function Generate a set of instances 
+  @param path the directory of instance files
+  @param NBCVXP the number of convex neighborhoods
+'''
 def create_instances_set():
 	path = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/"
 	NBCVXP = [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
@@ -353,18 +363,16 @@ def create_instances_set():
 			cvxpsize = 0.75
 			cvp = CvxPolygon('convex_polyon')
 			cvp.generate_convex_polygons(nb, cvxpsize, path+'cvxp_'+str(nb)+'_'+str(i))
+
 		for i in range(11, 21):
 			cvxpsize = 1
 			cvp = CvxPolygon('convex_polyon')
-
 			cvp.generate_convex_polygons(nb, cvxpsize, path+'cvxp_'+str(nb)+'_'+str(i))
+		
 		for i in range(21, 31):
 			cvxpsize = 1.25
 			cvp = CvxPolygon('convex_polyon')
 			cvp.generate_convex_polygons(nb, cvxpsize, path+'cvxp_'+str(nb)+'_'+str(i))
-
-
-
 
 if __name__ == "__main__":
 
@@ -375,7 +383,7 @@ if __name__ == "__main__":
 	# instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/cvxp_" + nb_cvxp + "_" + index
 	# cvp = CvxPolygon('convex_polyon_'+ 'nb_cvx_polygon= '+ nb_cvxp +' index= '+index)
 	# cvp.read_cvxp_instance(instance)
-	# sep_set= cvp.generate_separators(10)
+	# sep_set = cvp.generate_separators(10)
 	# cvp.evaluate_separators(sep_set)
 	# cvp.plot_hull()
 
