@@ -85,7 +85,7 @@ class PDTSPNModel:
 			self._terminate(model)
 			'''Plot the optimal tour '''
 
-			self._plot_wOptTour_M_M(model._opt_seq, model._opt_tour) if model._mode == 'M-M' else self._plot_wOptTour_1_1(model._opt_seq, model._opt_tour)
+			# self._plot_wOptTour_M_M(model._opt_seq, model._opt_tour) if model._mode == 'M-M' else self._plot_wOptTour_1_1(model._opt_seq, model._opt_tour)
 
 		except gp.GurobiError as e:
 			print('Error code ' + str(e.errno) + ': ' + str(e))
@@ -170,13 +170,14 @@ class PDTSPNModel:
 				# print('\n',end='')
 
 			cirset, curBestSeq = PDTSPNModel.find_all_subtours(curObj, model._size)
-			print(curBestSeq)
+			# print(curBestSeq)
 
 			optTour, objLen = CutPool.solve_SOCP_CvxPolyNgbs(model, curBestSeq)
 			model._opt_seq = curBestSeq
 			model._opt_tour = optTour
 			model._opt_objval = objLen
-			self._print_results(model)
+			self._write_results_to_file(model, self._instance._name)
+			# self._print_results(model)
 			
 	''' use a dictionary to hold all results '''
 	def _print_results(self, model):
@@ -191,6 +192,18 @@ class PDTSPNModel:
 			   'ObjVal': model._opt_objval}
 		print(ret)
 
+	def _write_results_to_file(self, model, filename):
+		out = {'nb_SECs': model._nb_SECs, 
+			   'nb_SDCs': model._nb_SDCs, 
+			   'nb_GBCs': model._nb_GBCs,
+			   'Time_SECs': model._time_SECs,
+			   'Time_SDCs': model._time_SDCs,
+			   'Time_GBCs': model._time_GBCs,
+			   'Model Time': model.Runtime,
+			   'MIPGap': model.MIPGap,
+			   'ObjVal': model._opt_objval}
+		with open('./ResultsMode_M-M/ret_' + filename,'w') as data:
+			data.write('ret_' +filename + ' = ' + str(out))
 
 	''' Generalized benders cuts added for different modes - CETSP, 1-1 and M-M '''
 	@staticmethod		
@@ -239,6 +252,7 @@ class PDTSPNModel:
 					PDTSPNModel.generate_smallest_SECs(Cirset, model)
 					end_time = timeit.default_timer()
 					model._time_SECs += end_time - start_time
+					model._nb_SECs += 1
 				if len(fseq) != 0:
 					start_time = timeit.default_timer()
 					mu0, mu1, obj = CutPool.generate_GBC_CvxPolyNgbs(model, fseq)
@@ -246,9 +260,9 @@ class PDTSPNModel:
 					for el in mu1:
 						constr += el[2] * (model._varE[el[0],el[1]] - 1.0)
 					model.cbLazy(obj + constr <= model._theta)
-					model._nb_GBCs += 1
 					end_time = timeit.default_timer()
 					model._time_GBCs += end_time - start_time
+					model._nb_GBCs += 1
 
 
 	@staticmethod
@@ -310,7 +324,6 @@ class PDTSPNModel:
 				s += 1
 			end_time = timeit.default_timer()
 			model._time_SDCs += end_time - start_time
-
 			# if s == len(subtour0)-1:
 			# 	constr += model._varE[subtour0[-1], subtour0[0]]
 			# 	model.cbLazy(constr <= len(subtour0)-1)
@@ -320,7 +333,7 @@ class PDTSPNModel:
 			PDTSPNModel.generate_smallest_SECs(Cirset, model)
 			end_time = timeit.default_timer()
 			model._time_SECs += end_time - start_time
-
+			model._nb_SECs += 1
 		''' case II: a full-length Hamiltonian path '''
 		if len(fseq) != 0:
 			sum_sd, constr = 0, 0
@@ -616,29 +629,101 @@ class PDTSPNModel:
 		return LPC
 
 if __name__ == "__main__":
-	mode = argv[1]
+	mode = 'run-all-instances-of-Mode-M-M'
 
-	''' Step 1: read instances '''
-	filepath = 'C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/'
-	instancename = 'cvxp_10_12'
-	inst = InstanceReader.CvxPolygon(instancename)
-	inst.read_cvxp_instance(filepath + instancename)
+	if mode  == 'test':
+		problem_type = 'M-M'
+		''' Step 1: read instances '''
+		filepath = 'C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/'
+		instancename = 'cvxp_20_4'
+		inst = InstanceReader.CvxPolygon(instancename)
+		inst.read_cvxp_instance(filepath + instancename)
 
-	SD_cvxp10 = [0,3, 2, 3, -1, -3, 5, -4, 4, -5, -3, 0]
-	SD_cvxp20 = [0, 5, 2, 3, -1, -3, 5, -10, 4, -8, 3, 5, 2, 3, -1, -3, 5, -10, 4, -8, 3, 0]
-	SD_cvxp24 = [0, 5, 2, 3, 1, -5, 5, -10, 4, -8, 3, 5, 2, 3, +1, -5, 5, -10, 4, -16, 3, 6, 4, -4, 2, 0]
-	SD_cvxp10_pair = [0, (1,4), (9,2), (3, 7), (5, 8), (6,10), 11]
-	SD_cvxp20_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), 21]
-	SD_cvxp30_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,29), (23, 27), (25, 28), (26,30), 31]
-	SD_cvxp26_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,25), (23, 26), 27]
-	SD_cvxp24_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,23), 25]
+		SD_cvxp10 = [0,3, 2, 3, -1, -3, 5, -4, 4, -5, -3, 0]
+		SD_cvxp20 = [0, 5, 2, 3, -1, -3, 5, -10, 4, -8, 3, 5, 2, 3, -1, -3, 5, -10, 4, -8, 3, 0]
+		SD_cvxp24 = [0, 5, 2, 3, 1, -5, 5, -10, 4, -8, 3, 5, 2, 3, +1, -5, 5, -10, 4, -16, 3, 6, 4, -4, 2, 0]
+		SD_cvxp10_pair = [0, (1,4), (9,2), (3, 7), (5, 8), (6,10), 11]
+		SD_cvxp20_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), 21]
+		SD_cvxp30_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,29), (23, 27), (25, 28), (26,30), 31]
+		SD_cvxp26_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,25), (23, 26), 27]
+		SD_cvxp24_pair = [0, (1,4), (2,9), (3, 7), (5, 8), (6,10), (11,14), (12,19), (13, 17), (15, 18), (16,20), (21,24), (22,23), 25]
 
-	''' Step 2: create model '''
-	mdl = PDTSPNModel(inst, SD_cvxp10, mode)
+		''' Step 2: create model '''
+		mdl = PDTSPNModel(inst, SD_cvxp20, problem_type)
 
-	''' Step 3: generate boundary-projection-closed separators '''
-	sep_set = inst.generate_separators(10)
-	mdl._add_BPC_separators(sep_set)
-	
-	''' Step 4: solve the model '''
-	mdl._solve()
+		''' Step 3: generate boundary-projection-closed separators '''
+		sep_set = inst.generate_separators(7)
+		mdl._add_BPC_separators(sep_set)
+		
+		''' Step 4: solve the model '''
+		mdl._solve()
+
+	if mode == 'run-single-instance-Mode1-1':
+		problem_type = '1-1'
+
+		''' Step 1: read instances '''
+		nb_cvxp = 6
+		instance_idx = 4
+		
+		instancename = 'cvxp_'+str(nb_cvxp)+'_' + str(instance_idx)
+		inst = InstanceReader.CvxPolygon(instancename)
+		filepath = 'C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/'
+		inst.read_cvxp_instance(filepath + instancename)
+		import SupplyDemandPairs
+
+		SD_cvxp10 = SupplyDemandPairs.AllSDPairs['cp_'+str(nb_cvxp)+'_idx_'+str(instance_idx)]
+		''' Step 2: create model '''
+		mdl = PDTSPNModel(inst, SD_cvxp10, problem_type)
+
+		''' Step 3: generate boundary-projection-closed separators '''
+		sep_set = inst.generate_separators(7)
+		mdl._add_BPC_separators(sep_set)
+		
+		''' Step 4: solve the model '''
+		mdl._solve()
+
+	if mode == 'run-all-instances-of-Mode-1-1':
+		problem_type = '1-1'
+		for nb_cvxp in range(20, 28, 2):
+			for instance_idx in [1,2,3,4,5,11,12,13,14,15,21,22,23,24,25]:
+				print('running instance ', nb_cvxp, ' - ', instance_idx)
+				''' Step 1: read instances '''				
+				instancename = 'cvxp_'+str(nb_cvxp)+'_' + str(instance_idx)
+				inst = InstanceReader.CvxPolygon(instancename)
+				filepath = 'C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/'
+				inst.read_cvxp_instance(filepath + instancename)
+				import SupplyDemandPairs
+
+				SD_cvxp10 = SupplyDemandPairs.AllSDPairs['cp_'+str(nb_cvxp)+'_idx_'+str(instance_idx)]
+				''' Step 2: create model '''
+				mdl = PDTSPNModel(inst, SD_cvxp10, problem_type)
+
+				''' Step 3: generate boundary-projection-closed separators '''
+				sep_set = inst.generate_separators(7)
+				mdl._add_BPC_separators(sep_set)
+				
+				''' Step 4: solve the model '''
+				mdl._solve()
+
+	if mode == 'run-all-instances-of-Mode-M-M':
+		problem_type = 'M-M'
+		for nb_cvxp in range(24, 26, 2):
+			for instance_idx in [24,25]:
+				print('running instance ', nb_cvxp, ' - ', instance_idx)
+				''' Step 1: read instances '''				
+				instancename = 'cvxp_'+str(nb_cvxp)+'_' + str(instance_idx)
+				inst = InstanceReader.CvxPolygon(instancename)
+				filepath = 'C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/'
+				inst.read_cvxp_instance(filepath + instancename)
+				import SupplyDemand_M_M
+
+				SD_cvxp10 = SupplyDemand_M_M.AllSDPairs['cp_'+str(nb_cvxp)+'_idx_'+str(instance_idx)]
+				''' Step 2: create model '''
+				mdl = PDTSPNModel(inst, SD_cvxp10, problem_type)
+
+				''' Step 3: generate boundary-projection-closed separators '''
+				sep_set = inst.generate_separators(7)
+				mdl._add_BPC_separators(sep_set)
+				
+				''' Step 4: solve the model '''
+				mdl._solve()

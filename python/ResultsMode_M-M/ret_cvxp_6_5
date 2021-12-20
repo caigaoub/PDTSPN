@@ -1,0 +1,1 @@
+ret_cvxp_6_5 = {'nb_SECs': 6, 'nb_SDCs': 3, 'nb_GBCs': 2, 'Time_SECs': 5.090000000018691e-05, 'Time_SDCs': 8.13000000001729e-05, 'Time_GBCs': 0.021562799999999882, 'Model Time': 0.03295707702636719, 'MIPGap': 0.0, 'ObjVal': 36.519948696888605}

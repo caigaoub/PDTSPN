@@ -1,0 +1,25 @@
+,Point
+1,Over all CPU time
+2,trend analysis: cutoff ratio vs number of separators 
+3,cutoff ratio vs number of neigborhoods 
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,add figures
+1,discuss other shapes. current approach is appliable to other neighborhoods 
+2,"given a certain shape of neigbhorhoods, we might improve the separator search algorithm"

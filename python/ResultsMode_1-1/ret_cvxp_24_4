@@ -1,0 +1,1 @@
+ret_cvxp_24_4 = {'nb_SECs': 194, 'nb_SDCs': 0, 'nb_GBCs': 931, 'Time_SECs': 0.015253999976266641, 'Time_SDCs': 0, 'Time_GBCs': 142.05994700006704, 'Model Time': 3275.953359603882, 'MIPGap': 0.0, 'ObjVal': 55.028754850665436}

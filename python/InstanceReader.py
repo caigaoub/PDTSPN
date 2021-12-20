@@ -14,7 +14,8 @@ from matplotlib.path import Path
 from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.ops import nearest_points
-
+import random
+import timeit
 ''' -------------------------------------------------
 	Things done: create a class CvxPolygon
 	Date: 9/21/2021
@@ -341,6 +342,32 @@ class CvxPolygon:
 			index += 1
 		file.close()
 
+def generate_supply_demand_1_1():
+	AllSDs = {}
+	for nb_cvxp in range(6, 32, 2):
+		for k in range(1, 31):
+			tarList = list(range(1, nb_cvxp+1));
+			random.shuffle(tarList)
+			Pairs = [0]
+			for idx in range(0, nb_cvxp, 2):
+				Pairs.append((tarList[idx], tarList[idx+1]))
+			Pairs.append(nb_cvxp+1)
+			AllSDs['cp_'+str(nb_cvxp)+'_idx_'+str(k)] = Pairs
+	print(AllSDs)
+
+def generate_supply_demand_M_M():
+	AllSDs = {}
+	for nb_cvxp in range(6, 32, 2):
+		for k in range(1, 31):
+			while True:
+				x = [random.randint(-10, 10) for p in range(0, nb_cvxp)]
+				if sum(x) > 0 and sum(x) < 10:
+					x.insert(nb_cvxp,0)
+					x.insert(0, 0)
+					AllSDs['cp_'+str(nb_cvxp)+'_idx_'+str(k)] = x
+					break
+	print(AllSDs)
+
 def create_instances_set():
 	path = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/"
 	NBCVXP = [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
@@ -365,15 +392,53 @@ def create_instances_set():
 if __name__ == "__main__":
 
 	'''choose which instance by two parameters: nb of convex polygons and instance index  '''
-	nb_cvxp = argv[1]
-	index = argv[2]
-	''' create instance object '''
-	instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/cvxp_" + nb_cvxp + "_" + index
-	cvp = CvxPolygon('convex_polyon_'+ 'nb_cvx_polygon= '+ nb_cvxp +' index= '+index)
-	cvp.read_cvxp_instance(instance)
-	sep_set= cvp.generate_separators(10)
-	cvp.evaluate_separators(sep_set)
-	cvp.plot_hull()
+	# nb_cvxp = argv[1]
+	# index = argv[2]
+	# ''' create instance object '''
+	# instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/cvxp_" + nb_cvxp + "_" + index
+	# cvp = CvxPolygon('convex_polyon_'+ 'nb_cvx_polygon= '+ nb_cvxp +' index= '+index)
+	# cvp.read_cvxp_instance(instance)
+	# sep_set= cvp.generate_separators(10)
+	# cvp.evaluate_separators(sep_set)
+	# cvp.plot_hull()
 
 
 	# create_instances_set()
+
+	# generate_supply_demand_1_1()
+	# generate_supply_demand_M_M()
+
+
+	'''ddd '''
+	TIME = {}
+	for nb_cvxp in range(6, 28, 2):
+		for instance_idx in [1,2,3,4,5,11,12,13,14,15,21,22,23,24,25]:
+			filename = 'cvxp_' + str(nb_cvxp) + '_' + str(instance_idx)
+			instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/" + filename
+			# result = []
+			for nb_seps in [6, 9, 12, 15]:
+				print(nb_cvxp, instance_idx, nb_seps)
+				cvp = CvxPolygon('convex_polyon_'+ 'nb_cvx_polygon= '+ str(nb_cvxp) +' index= '+str(instance_idx))
+				cvp.read_cvxp_instance(instance)
+				start_time = timeit.default_timer()
+
+				sep_set= cvp.generate_separators(nb_seps)
+				stop_time = timeit.default_timer()
+				elapse_time = stop_time - start_time
+				TIME[filename + '_' + str(nb_seps)] = elapse_time
+	print(TIME)
+			# 	result.append(cvp.evaluate_separators(sep_set))
+			# with open('./ResultsSeparatorsEvaluation/ret_' + filename,'w') as data:
+			# 	data.write('ret_' +filename + ' = ' + str(result))
+
+
+
+
+
+
+
+
+
+
+
+			
