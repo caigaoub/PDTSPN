@@ -202,7 +202,7 @@ class PDTSPNModel:
 			   'Model Time': model.Runtime,
 			   'MIPGap': model.MIPGap,
 			   'ObjVal': model._opt_objval}
-		with open('./ResultsMode_M-M/ret_' + filename,'w') as data:
+		with open('./ResultsMode_1-1/ret_' + filename,'w') as data:
 			data.write('ret_' +filename + ' = ' + str(out))
 
 	''' Generalized benders cuts added for different modes - CETSP, 1-1 and M-M '''
@@ -629,7 +629,7 @@ class PDTSPNModel:
 		return LPC
 
 if __name__ == "__main__":
-	mode = 'run-all-instances-of-Mode-M-M'
+	mode = 'run-all-instances-of-Mode-1-1'
 
 	if mode  == 'test':
 		problem_type = 'M-M'
@@ -684,8 +684,8 @@ if __name__ == "__main__":
 
 	if mode == 'run-all-instances-of-Mode-1-1':
 		problem_type = '1-1'
-		for nb_cvxp in range(20, 28, 2):
-			for instance_idx in [1,2,3,4,5,11,12,13,14,15,21,22,23,24,25]:
+		for nb_cvxp in [30]:
+			for instance_idx in [13,14,15,21,22,23,24,25]:
 				print('running instance ', nb_cvxp, ' - ', instance_idx)
 				''' Step 1: read instances '''				
 				instancename = 'cvxp_'+str(nb_cvxp)+'_' + str(instance_idx)
@@ -707,8 +707,8 @@ if __name__ == "__main__":
 
 	if mode == 'run-all-instances-of-Mode-M-M':
 		problem_type = 'M-M'
-		for nb_cvxp in range(24, 26, 2):
-			for instance_idx in [24,25]:
+		for nb_cvxp in [28]:
+			for instance_idx in [1]:
 				print('running instance ', nb_cvxp, ' - ', instance_idx)
 				''' Step 1: read instances '''				
 				instancename = 'cvxp_'+str(nb_cvxp)+'_' + str(instance_idx)

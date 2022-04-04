@@ -65,7 +65,7 @@ class CvxPolygon:
 		ax = fig.add_subplot(111)
 		ax.set_aspect('equal', adjustable='box')
 		for sep in seps_plot:
-			plt.plot(sep[0], sep[1],'r', alpha=0.5)
+			plt.plot(sep[0], sep[1],'k-.', alpha=1, linewidth=0.8)
 
 		minx, maxx, miny, maxy = self._depot[0], self._depot[0], self._depot[1], self._depot[1]
 		pset = [] # store all vertices of the convex polygons
@@ -77,7 +77,12 @@ class CvxPolygon:
 				miny = miny if miny <= np.min(hull.points[hull.vertices,1]) else np.min(hull.points[hull.vertices,1])
 		ax.set_xlim([minx-1, maxx+1])
 		ax.set_ylim([miny-1, maxy+1])
-		plt.plot(self._depot[0], self._depot[1],'rs',ms=10)
+		# ax.set_xlim([minx-0.5, maxx+0.5])
+		# ax.set_ylim([miny-0.5, maxy+0.5])
+		# ax.set_xlim([5, 14])
+		# ax.set_ylim([3, 8])
+		ax.tick_params(axis='both', labelsize=15)
+		plt.plot(self._depot[0], self._depot[1],'ko',ms=5)
 		itr, cx, cy = 1, 0, 0
 		for hull in self._HULLs:
 			#Plot convex hull
@@ -88,7 +93,7 @@ class CvxPolygon:
 				cy = np.mean(hull.points[hull.vertices,1])
 					#Plot centroid
 				plt.plot(cx, cy,'ko',ms=2)
-			ax.annotate(str(itr), xy=(cx, cy),textcoords="offset points", xytext=(cx, cy),size=14)
+			# ax.annotate(str(itr), xy=(cx, cy),textcoords="offset points", xytext=(cx, cy),size=14)
 			itr += 1
 		plt.show()
 
@@ -137,7 +142,7 @@ class CvxPolygon:
 				bestsep, endpoints = self.binary_search_separator(theta, farp2, center, 0, 1, sign=False)
 				seps_plot.append(endpoints)
 				sep_set.append(bestsep)
-		# self.plot_hull(seps_plot=seps_plot)
+		self.plot_hull(seps_plot=seps_plot)
 		self._SEPs = sep_set
 		return sep_set	
 
@@ -145,7 +150,7 @@ class CvxPolygon:
 		pivot = [0 , 0]
 		pivot[0] = farp[0] 
 		pivot[1] = farp[1]
-		linesegscale = 20 
+		linesegscale = 10 
 		x3 = pivot[0] + linesegscale * math.cos(theta)
 		y3 = pivot[1] + linesegscale * math.sin(theta)
 		x4 = pivot[0] + linesegscale * math.cos(theta + math.pi)
@@ -377,15 +382,15 @@ def create_instances_set():
 if __name__ == "__main__":
 
 	'''choose which instance by two parameters: nb of convex polygons and instance index  '''
-	# nb_cvxp = argv[1]
-	# index = argv[2]
-	# ''' create instance object '''
-	# instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/cvxp_" + nb_cvxp + "_" + index
-	# cvp = CvxPolygon('convex_polyon_'+ 'nb_cvx_polygon= '+ nb_cvxp +' index= '+index)
-	# cvp.read_cvxp_instance(instance)
-	# sep_set = cvp.generate_separators(10)
+	nb_cvxp = argv[1]
+	index = argv[2]
+	''' create instance object '''
+	instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/cvxp_" + nb_cvxp + "_" + index
+	cvp = CvxPolygon('convex_polyon_'+ 'nb_cvx_polygon= '+ nb_cvxp +' index= '+index)
+	cvp.read_cvxp_instance(instance)
+	sep_set = cvp.generate_separators(10)
 	# cvp.evaluate_separators(sep_set)
 	# cvp.plot_hull()
 
 
-	create_instances_set()
+	# create_instances_set()

@@ -411,11 +411,11 @@ if __name__ == "__main__":
 
 	'''ddd '''
 	TIME = {}
-	for nb_cvxp in range(6, 28, 2):
+	for nb_cvxp in range(28, 32, 2):
 		for instance_idx in [1,2,3,4,5,11,12,13,14,15,21,22,23,24,25]:
 			filename = 'cvxp_' + str(nb_cvxp) + '_' + str(instance_idx)
 			instance = "C:/Users/caiga/Dropbox/Box_Research/Projects/CETSP/CETSP_Code/CETSP/dat/Cai2/" + filename
-			# result = []
+			result = []
 			for nb_seps in [6, 9, 12, 15]:
 				print(nb_cvxp, instance_idx, nb_seps)
 				cvp = CvxPolygon('convex_polyon_'+ 'nb_cvx_polygon= '+ str(nb_cvxp) +' index= '+str(instance_idx))
@@ -426,10 +426,11 @@ if __name__ == "__main__":
 				stop_time = timeit.default_timer()
 				elapse_time = stop_time - start_time
 				TIME[filename + '_' + str(nb_seps)] = elapse_time
-	print(TIME)
-			# 	result.append(cvp.evaluate_separators(sep_set))
-			# with open('./ResultsSeparatorsEvaluation/ret_' + filename,'w') as data:
-			# 	data.write('ret_' +filename + ' = ' + str(result))
+				result.append(cvp.evaluate_separators(sep_set))
+			with open('./ResultsSeparatorsEvaluation/ret_' + filename,'w') as data:
+				data.write('ret_' +filename + ' = ' + str(result))
+
+	# print(TIME)
 
 
 
