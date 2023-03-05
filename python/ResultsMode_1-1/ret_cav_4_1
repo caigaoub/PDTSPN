@@ -1,0 +1,1 @@
+ret_cav_4_1 = {'nb_SECs': 2, 'nb_SDCs': 0, 'nb_GBCs': 9, 'Time_SECs': 2.650000000004038e-05, 'Time_SDCs': 0, 'Time_GBCs': 0.13641870000000011, 'Model Time': 0.15200233459472656, 'MIPGap': 0.0, 'ObjVal': 7.999999232702116}

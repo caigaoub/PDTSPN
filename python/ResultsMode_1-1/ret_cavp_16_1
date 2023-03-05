@@ -1,0 +1,1 @@
+ret_cavp_16_1 = {'nb_SECs': 1386, 'nb_SDCs': 0, 'nb_GBCs': 1575, 'Time_SECs': 0.022368900000018233, 'Time_SDCs': 0, 'Time_GBCs': 107.8414003, 'Model Time': 122.98505592346191, 'MIPGap': 0.0, 'ObjVal': 35.73851976206784}

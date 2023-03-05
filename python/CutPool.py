@@ -93,38 +93,6 @@ def generate_fractionalSolCut(model, curSol):
 						mu1.append([i,j,varZ[i,j].x - model._zbar[i,j]])					
 
 			mu0 = []
-			# for i in range(len(fseq)-2):
-			# 	for j in range(i+2, len(fseq)-1):
-			# 		if i == 0:
-			# 			val =  math.sqrt((model._depot1[0] - varX[fseq[j]-1].x)**2 + (model._depot1[1]-varY[fseq[j]-1].x)**2)
-			# 			val = val - model._zbar[0,fseq[j]]
-			# 			mu0.append([0, fseq[j],val])
-			# 		if i != 0:
-			# 			val =  math.sqrt((varX[fseq[i]-1].x - varX[fseq[j]-1].x)**2 + (varY[fseq[i]-1].x-varY[fseq[j]-1].x)**2)	
-			# 			val = val - model._zbar[fseq[i],fseq[j]]
-			# 			mu0.append([fseq[i], fseq[j], val])	
-
-
-			# for i in range(1, len(fseq)-2):
-			# 	val =  math.sqrt((model._depot2[0] - varX[fseq[i]-1].x)**2 + (model._depot2[1]-varY[fseq[i]-1].x)**2)	
-			# 	val = val - model._zbar[fseq[i],model._size-1]
-			# 	mu0.append([fseq[i], model._size-1,val])
-				# mu0.append([ model._size-1,fseq[i],val])
-
-			# print(mu1)
-			# print(mu0)
-			# for i in range(model._size):
-			# 	for j in range(model._size):
-			# 		if i!=j:
-			# 			print(varZ[i,j].x, end=' ')
-			# 	print('')
-			# print("(", model._depot1[0], model._depot1[1],")")
-			# for i in range(nb_tars):
-			# 	print("(", varX[fseq[i+1]-1].x,varY[fseq[i+1]-1].x,")")
-			# print('\n')
-			# print(' ===>>> Gurobi Time: %g' % SP_m.Runtime)
-			# print(' ===>>> SOCP OBJ: %g' % SP_m.objVal)
-
 			return mu0, mu1, SP_m.objVal
 
 	except gp.GurobiError as e:
@@ -410,6 +378,136 @@ def generate_GBC_CvxPolyNgbs(model, fseq):
 	except AttributeError:
 		print('Encountered an attribute error')
 
+''' generate Generalized Benders cuts when neigbhorhood regions are concave polygon'''
+def generate_GBC_MixedPolyNgbs(model, fseq):
+	nb_tars = model._size - 2
+	vismat = np.zeros((model._size,model._size))
+	for i in range(len(fseq)-1):
+		vismat[fseq[i],fseq[i+1]] = 1
+	# print(vismat)
+	max_num_ploygonedges = 0
+	for polygon in model._POLYGONs:
+		vertices = list(polygon.exterior.coords)
+		if len(vertices)-1 > max_num_ploygonedges:
+			max_num_ploygonedges = len(vertices)-1
+
+	try:
+		SP_m = gp.Model("SubProblem_MixedPolyNgbs")
+		SP_m.setParam(GRB.Param.OutputFlag, 0)
+		SP_m.setParam(GRB.Param.TimeLimit, 1000.0)
+		varZ = SP_m.addVars(model._size, model._size, lb=0.00001,ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="Z")
+		varX = SP_m.addVars(model._size-2, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="X")
+		varY = SP_m.addVars(model._size-2, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="Y")
+		varS = SP_m.addVars(model._size, model._size, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="S")
+		varT = SP_m.addVars(model._size, model._size, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="T")
+		varLambda = SP_m.addVars(model._size-2, max_num_ploygonedges, lb=0, ub=1.0, vtype=GRB.CONTINUOUS,name="Lambda")
+		varPhi 	  = SP_m.addVars(model._size-2, max_num_ploygonedges, vtype=GRB.BINARY, name="Phi")
+
+		SP_m.update()
+
+		# objective function
+		obj = 0
+		for i in range(model._size):
+			for j in range(model._size):
+				obj += vismat[i,j] * (varZ[i,j] - model._zbar[i,j])
+				# obj += vismat[i,j] * varZ[i,j]
+
+		SP_m.setObjective(obj, GRB.MINIMIZE)
+		SP_m.update()
+
+		# constraints - depot1
+		for i in range(model._size):
+			for j in range(i+1, model._size):
+				SP_m.addConstr(varS[j,i]==varS[i,j])
+				SP_m.addConstr(varT[j,i]==varT[i,j])
+				SP_m.addConstr(varZ[j,i]==varZ[i,j])
+			SP_m.update()
+
+		for i in range(0, nb_tars):
+			SP_m.addConstr(varS[0,i+1] == model._depot1[0]-varX[i], 'cS_'+str(0)+str(i+1))
+			SP_m.addConstr(varS[i+1,0]==varS[0,i+1])
+			SP_m.addConstr(varT[0,i+1] == model._depot1[1]-varY[i], 'cT_'+str(0)+str(i+1))
+			SP_m.addConstr(varT[i+1,0]==varT[0,i+1])
+
+		for i in range(0, nb_tars):
+			SP_m.addConstr(varS[i+1,nb_tars+1] == varX[i] - model._depot2[0], 'cS_'+str(i+1)+str(nb_tars+1))
+			SP_m.addConstr(varS[nb_tars+1,i+1]==varS[i+1,nb_tars+1])
+			SP_m.addConstr(varT[i+1,nb_tars+1] == varY[i] - model._depot2[1], 'cT_'+str(i+1)+str(nb_tars+1))
+			SP_m.addConstr(varT[nb_tars+1,i+1]==varT[i+1,nb_tars+1])
+
+		for i in range(1, nb_tars+1):
+			for j in range(i+1, nb_tars+1):
+				SP_m.addConstr(varS[i,j] == varX[i-1]-varX[j-1], 'cS_'+str(i)+str(j))
+				SP_m.addConstr(varS[j,i] == varS[i,j])
+				SP_m.addConstr(varT[i,j] == varY[i-1]-varY[j-1], 'cT_'+str(i)+str(j))
+				SP_m.addConstr(varT[j,i] == varT[i,j])
+			SP_m.update()
+		
+		for i in range(model._size):
+			for j in range(model._size):
+				if i!=j:
+					SP_m.addConstr(varS[i,j]*varS[i,j] + varT[i,j]*varT[i,j] <= varZ[i,j]*varZ[i,j], 'cZ_'+str(i)+str(j)) #constraint S
+			SP_m.update()
+
+		for pindex, polygon in enumerate(model._POLYGONs):
+			if model._neighborhood_types[pindex] == 'concave':
+				# add concave polygon constraints 
+				constrX, constrY, constrSumPhi = 0, 0, 0
+				vertices = list(polygon.exterior.coords)
+				for index in range(len(vertices)-1):
+					constrX += varLambda[pindex,index]*(vertices[index][0] - vertices[index+1][0]) + varPhi[pindex,index]*vertices[index+1][0]
+					constrY += varLambda[pindex,index]*(vertices[index][1] - vertices[index+1][1]) + varPhi[pindex,index]*vertices[index+1][1]
+					constrSumPhi += varPhi[pindex,index]
+				SP_m.addConstr(constrX==varX[pindex])
+				SP_m.addConstr(constrY==varY[pindex])
+				SP_m.addConstr(constrSumPhi==1, "sum_Phi_constr")
+				SP_m.update()
+			else:
+				# add convex polygon constraints
+				lpc = model._LPC[pindex]
+				for c in lpc:
+					SP_m.addConstr(c[0] * varX[pindex] + c[1] * varY[pindex] + c[2] <= 0)
+				SP_m.update()
+
+
+		for pindex, polygon in enumerate(model._POLYGONs):
+			if model._neighborhood_types[pindex] == 'concave':
+				vertices = list(polygon.exterior.coords)
+				for index in range(len(vertices)-1):
+					SP_m.addConstr(varLambda[pindex,index]<=varPhi[pindex,index])				
+				SP_m.update()
+
+		# add boundary-projection-closed separators if exists
+		if True:
+			for sep in model._BPC_separators:
+				for k in range(nb_tars):
+					SP_m.addConstr(sep[0] * varX[k] + sep[1] * varY[k] + sep[2] <= 0)
+		SP_m.update()
+
+		SP_m.optimize()
+
+		''' ------------- model output  ----------------------'''
+		if SP_m.status == GRB.OPTIMAL or SP_m.status == GRB.TIME_LIMIT:
+		
+			mu1 = []
+			for i in range(model._size):
+				for j in range(model._size):
+					if i!=j and vismat[i,j] > 0:
+						# mu1.append([i,j,varZ[i,j].x])
+						mu1.append([i,j,varZ[i,j].x - model._zbar[i,j]])
+						# mu1.append([j,i,varZ[i,j].x - model._zbar[i,j]])					
+
+
+			mu0 = []
+			return mu0, mu1, SP_m.objVal
+
+	except gp.GurobiError as e:
+		print('Error code ' + str(e.errno) + ': ' + str(e))
+	except AttributeError:
+		print('Subproblem encountered an attribute error')
+
+
+
 
 def solve_SOCP_Disc(_depot, _Ox, _Oy, _Or, fseq):
 	nb_tars = len(fseq) -2
@@ -579,7 +677,7 @@ def solve_SOCP_CvxPolyNgbs(model, fseq):
 		# add convex polygon constraints 
 		idx = 0
 		# print(model._LPC)
-		for lpc in model._LPC:
+		for lpc in False:
 			for c in lpc:
 				SP_m.addConstr(c[0]*varX[idx]+c[1]*varY[idx] + c[2] <= 0)
 			idx += 1
@@ -600,3 +698,108 @@ def solve_SOCP_CvxPolyNgbs(model, fseq):
 		print('Error code ' + str(e.errno) + ': ' + str(e))
 	except AttributeError:
 		print('Encountered an attribute error')
+
+
+def solve_ConcavePolyNgbs(model, fseq):
+	nb_tars = model._size - 2
+	vismat = np.zeros((model._size,model._size))
+	for i in range(len(fseq)-1):
+		vismat[fseq[i],fseq[i+1]] = 1
+	# print(vismat)
+	max_num_ploygonedges = 0
+	for polygon in model._POLYGONs:
+		vertices = list(polygon.exterior.coords)
+		if len(vertices)-1 > max_num_ploygonedges:
+			max_num_ploygonedges = len(vertices)-1
+	try:
+		SP_m = gp.Model("SOCP_CvxPolyNgbs")
+		SP_m.setParam(GRB.Param.OutputFlag, 0)
+		SP_m.setParam(GRB.Param.TimeLimit, 1000.0)
+
+		varZ = SP_m.addVars(model._size, model._size, lb=0.00001,ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="Z")
+		varX = SP_m.addVars(model._size-2, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="X")
+		varY = SP_m.addVars(model._size-2, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="Y")
+		varS = SP_m.addVars(model._size, model._size, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="S")
+		varT = SP_m.addVars(model._size, model._size, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,name="T")
+		varLambda = SP_m.addVars(model._size-2, max_num_ploygonedges, lb=0, ub=1.0, vtype=GRB.CONTINUOUS,name="Lambda")
+		varPhi 	  = SP_m.addVars(model._size-2, max_num_ploygonedges, vtype=GRB.BINARY, name="Phi")
+		SP_m.update()
+
+		# objective function
+		obj = 0
+		for i in range(model._size):
+			for j in range(model._size):
+				# obj += vismat[i,j] * (varZ[i,j] - model._zbar[i,j])
+				obj += vismat[i,j] * varZ[i,j]
+
+		SP_m.setObjective(obj, GRB.MINIMIZE)
+
+		# constraints - depot1
+		for i in range(model._size):
+			for j in range(i+1, model._size):
+				SP_m.addConstr(varS[j,i]==varS[i,j])
+				SP_m.addConstr(varT[j,i]==varT[i,j])
+				SP_m.addConstr(varZ[j,i]==varZ[i,j])
+			SP_m.update()
+
+		for i in range(0, nb_tars):
+			SP_m.addConstr(varS[0,i+1] == model._depot1[0]-varX[i], 'cS_'+str(0)+str(i+1))
+			SP_m.addConstr(varS[i+1,0]==varS[0,i+1])
+			SP_m.addConstr(varT[0,i+1] == model._depot1[1]-varY[i], 'cT_'+str(0)+str(i+1))
+			SP_m.addConstr(varT[i+1,0]==varT[0,i+1])
+
+		for i in range(0, nb_tars):
+			SP_m.addConstr(varS[i+1,nb_tars+1] == varX[i] - model._depot2[0], 'cS_'+str(i+1)+str(nb_tars+1))
+			SP_m.addConstr(varS[nb_tars+1,i+1]==varS[i+1,nb_tars+1])
+			SP_m.addConstr(varT[i+1,nb_tars+1] == varY[i] - model._depot2[1], 'cT_'+str(i+1)+str(nb_tars+1))
+			SP_m.addConstr(varT[nb_tars+1,i+1]==varT[i+1,nb_tars+1])
+
+		for i in range(1, nb_tars+1):
+			for j in range(i+1, nb_tars+1):
+				SP_m.addConstr(varS[i,j] == varX[i-1]-varX[j-1], 'cS_'+str(i)+str(j))
+				SP_m.addConstr(varS[j,i] == varS[i,j])
+				SP_m.addConstr(varT[i,j] == varY[i-1]-varY[j-1], 'cT_'+str(i)+str(j))
+				SP_m.addConstr(varT[j,i] == varT[i,j])
+			SP_m.update()
+		
+		for i in range(model._size):
+			for j in range(model._size):
+				if i!=j:
+					SP_m.addConstr(varS[i,j]*varS[i,j] + varT[i,j]*varT[i,j] <= varZ[i,j]*varZ[i,j], 'cZ_'+str(i)+str(j)) #constraint S
+			SP_m.update()
+
+		# add concave polygon constraints 
+		for pindex, polygon in enumerate(model._POLYGONs):
+			constrX, constrY, constrSumPhi = 0, 0, 0
+			vertices = list(polygon.exterior.coords)
+			for index in range(len(vertices)-1):
+				constrX += varLambda[pindex,index]*(vertices[index][0] - vertices[index+1][0]) + varPhi[pindex,index]*vertices[index+1][0]
+				constrY += varLambda[pindex,index]*(vertices[index][1] - vertices[index+1][1]) + varPhi[pindex,index]*vertices[index+1][1]
+				constrSumPhi += varPhi[pindex,index]
+			SP_m.addConstr(constrX==varX[pindex], "x_in_concavepoly_constr")
+			SP_m.addConstr(constrY==varY[pindex], "y_in_concavepoly_constr")
+			SP_m.addConstr(constrSumPhi==1, "sum_Phi_constr")
+			SP_m.update()
+
+		for pindex, polygon in enumerate(model._POLYGONs):
+			vertices = list(polygon.exterior.coords)
+			for index in range(len(vertices)-1):
+				SP_m.addConstr(varLambda[pindex,index]<=varPhi[pindex,index], "lambda<Phi_constr")				
+			SP_m.update()
+		SP_m.update()
+		SP_m.optimize()
+
+		''' ------------- model output  ----------------------'''
+		if SP_m.status == GRB.OPTIMAL or SP_m.status == GRB.TIME_LIMIT:
+			optTour = [model._depot1]
+			for i in range(1, nb_tars+1):
+				optTour.append([varX[fseq[i]-1].x, varY[fseq[i]-1].x])
+			optTour.append(model._depot2)
+			# print(optTour)
+			optTour = np.array(optTour)
+			return optTour, SP_m.objVal
+
+	except gp.GurobiError as e:
+		print('Error code ' + str(e.errno) + ': ' + str(e))
+	except AttributeError:
+		print('Solve subproblem directly: error')

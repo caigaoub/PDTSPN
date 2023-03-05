@@ -18,7 +18,7 @@ import random
 import timeit
 ''' -------------------------------------------------
 	Things done: create a class CvxPolygon
-	Date: 9/21/2021
+	Date: 01/14/2023
 	-------------------------------------------------
 '''
 
@@ -91,7 +91,7 @@ class CvxPolygon:
 		plt.show()
 
 	
-	def generate_separators(self, nb_intvals = 20 ):
+	def generate_separators(self, nb_intvals = 20):
 		# ---> Step 1: find the center of the smallest horizontal rectangle that contains all polygon vertices
 		minx, maxx, miny, maxy = self._depot[0], self._depot[0], self._depot[1], self._depot[1]
 		pset = [] # store all vertices of the convex polygons
@@ -330,17 +330,6 @@ class CvxPolygon:
 			itr += 1
 		plt.show()
 
-	def write_cvxp_instance(self, instance, depot, POINTS):
-		file = open(instance,'w')
-		file.write(str('{0:.3f}'.format(depot[0]))+':'+str('{0:.3f}'.format(depot[1]))+'\n')
-		index = 1
-		for pts in POINTS:
-			file.write('cp'+str(index)+':\t')
-			for p in pts:
-				file.write(str('{0:.3f}'.format(p[0])) + ':' + str('{0:.3f}'.format(p[1])) + '\t')
-			file.write('\n')
-			index += 1
-		file.close()
 
 def generate_supply_demand_1_1():
 	AllSDs = {}

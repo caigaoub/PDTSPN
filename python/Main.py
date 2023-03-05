@@ -172,7 +172,7 @@ class PDTSPNModel:
 			cirset, curBestSeq = PDTSPNModel.find_all_subtours(curObj, model._size)
 			# print(curBestSeq)
 
-			optTour, objLen = CutPool.solve_SOCP_CvxPolyNgbs(model, curBestSeq)
+			optTour, objLen = CutPool.solve_NonCvxPolyNgbs(model, curBestSeq)
 			model._opt_seq = curBestSeq
 			model._opt_tour = optTour
 			model._opt_objval = objLen
@@ -205,7 +205,8 @@ class PDTSPNModel:
 		with open('./ResultsMode_1-1/ret_' + filename,'w') as data:
 			data.write('ret_' +filename + ' = ' + str(out))
 
-	''' Generalized benders cuts added for different modes - CETSP, 1-1 and M-M '''
+	''' 
+	Generalized benders cuts added for different modes - CETSP, 1-1 and M-M '''
 	@staticmethod		
 	def callback_GBD(model, where):
 		if where == GRB.Callback.MIPSOL:
@@ -263,7 +264,24 @@ class PDTSPNModel:
 					end_time = timeit.default_timer()
 					model._time_GBCs += end_time - start_time
 					model._nb_GBCs += 1
-
+					
+			if model._mode == 'NonConvex':
+				if len(Cirset) != 0:
+					start_time = timeit.default_timer()
+					PDTSPNModel.generate_smallest_SECs(Cirset, model)
+					end_time = timeit.default_timer()
+					model._time_SECs += end_time - start_time
+					model._nb_SECs += 1
+				if len(fseq) != 0:
+					start_time = timeit.default_timer()
+					mu0, mu1, obj = CutPool.generate_GBC_NonCvxPolyNgbs(model, fseq)
+					constr = 0
+					for el in mu1:
+						constr += el[2] * (model._varE[el[0],el[1]] - 1.0)
+					model.cbLazy(obj + constr <= model._theta)
+					end_time = timeit.default_timer()
+					model._time_GBCs += end_time - start_time
+					model._nb_GBCs += 1
 
 	@staticmethod
 	def find_all_subtours(curSol, matsize):
